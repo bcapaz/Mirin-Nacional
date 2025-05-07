@@ -40,11 +40,10 @@ export function TweetCard({ tweet, isComment = false }: TweetCardProps) {
   const [comments, setComments] = useState<any[]>([]);
   const queryClient = useQueryClient();
 
-  // Buscar comentários
   const fetchComments = async () => {
     try {
       const res = await apiRequest('GET', `/api/tweets/${tweet.id}/comments`);
-      setComments(res || []);
+      setComments(res?.comments || []);
     } catch (error) {
       toast({
         title: 'Erro',
@@ -100,6 +99,12 @@ export function TweetCard({ tweet, isComment = false }: TweetCardProps) {
     }
   });
 
+  const handleCommentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentContent.trim()) return;
+    commentMutation.mutate();
+  };
+
   const handleLike = () => {
     if (!user) return;
     likeMutation.mutate();
@@ -110,12 +115,6 @@ export function TweetCard({ tweet, isComment = false }: TweetCardProps) {
     if (confirm('Tem certeza que deseja excluir este tweet?')) {
       deleteMutation.mutate();
     }
-  };
-
-  const handleCommentSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!commentContent.trim()) return;
-    commentMutation.mutate();
   };
 
   const timeAgo = formatDistanceToNow(new Date(tweet.createdAt), {
@@ -131,7 +130,7 @@ export function TweetCard({ tweet, isComment = false }: TweetCardProps) {
       <div className="flex space-x-3">
         <div className="flex-shrink-0">
           <Link href={`/profile/${tweet.user.username}`}>
-            <div 
+            <div
               className="h-10 w-10 rounded-full flex items-center justify-center"
               style={{ backgroundColor: tweet.user.avatarColor || '#009c3b' }}
             >
@@ -141,14 +140,14 @@ export function TweetCard({ tweet, isComment = false }: TweetCardProps) {
             </div>
           </Link>
         </div>
-        
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center">
             <Link href={`/profile/${tweet.user.username}`} className="font-medium hover:underline">
               {tweet.user.username}
             </Link>
             {user?.isAdmin && (
-              <button 
+              <button
                 onClick={handleDelete}
                 className="ml-auto text-muted-foreground hover:text-destructive"
               >
@@ -171,11 +170,7 @@ export function TweetCard({ tweet, isComment = false }: TweetCardProps) {
                   onClick={() => setMediaOpen(true)}
                 />
               ) : isVideo(tweet.mediaUrl) ? (
-                <video
-                  src={tweet.mediaUrl}
-                  controls
-                  className="max-h-80 w-auto mx-auto"
-                />
+                <video src={tweet.mediaUrl} controls className="max-h-80 w-auto mx-auto" />
               ) : null}
             </div>
           )}
@@ -208,64 +203,48 @@ export function TweetCard({ tweet, isComment = false }: TweetCardProps) {
             </button>
           </div>
 
-          {/* Formulário de comentário */}
           {showCommentForm && (
             <form onSubmit={handleCommentSubmit} className="mt-3 transition-all duration-300 ease-in-out">
               <textarea
                 value={commentContent}
                 onChange={(e) => setCommentContent(e.target.value)}
-                placeholder="Escreva seu comentário..."
+                placeholder="Escreva seu comentário."
                 className="w-full p-2 border rounded-lg text-sm bg-background text-foreground"
                 rows={3}
                 required
               />
               <div className="flex justify-end gap-2 mt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowCommentForm(false)}
-                >
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowCommentForm(false)}>
                   Cancelar
                 </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={commentMutation.isLoading || !commentContent.trim()}
-                >
+                <Button type="submit" size="sm" disabled={commentMutation.isLoading || !commentContent.trim()}>
                   {commentMutation.isLoading ? 'Enviando...' : 'Comentar'}
                 </Button>
               </div>
             </form>
           )}
+
+          {!isComment && comments.length > 0 && (
+            <div className="border-l-2 border-gray-200 pl-4 mt-3 space-y-3">
+              {comments.map((comment) => (
+                <TweetCard key={comment.id} tweet={comment} isComment={true} />
+              ))}
+            </div>
+          )}
+
+          {mediaOpen && isImage(tweet.mediaUrl) && (
+            <Dialog open={mediaOpen} onOpenChange={setMediaOpen}>
+              <DialogContent className="max-w-4xl p-0 bg-transparent border-none">
+                <img
+                  src={tweet.mediaUrl}
+                  alt=""
+                  className="max-h-[90vh] max-w-full object-contain"
+                />
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
-
-      {/* Lista de comentários */}
-      {!isComment && comments.length > 0 && (
-        <div className="border-l-2 border-gray-200 pl-4 mt-3 space-y-3">
-          {comments.map((comment) => (
-            <TweetCard 
-              key={comment.id} 
-              tweet={comment} 
-              isComment={true}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Modal para mídia */}
-      {mediaOpen && isImage(tweet.mediaUrl) && (
-        <Dialog open={mediaOpen} onOpenChange={setMediaOpen}>
-          <DialogContent className="max-w-4xl p-0 bg-transparent border-none">
-            <img
-              src={tweet.mediaUrl}
-              alt=""
-              className="max-h-[90vh] max-w-full object-contain"
-            />
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }
