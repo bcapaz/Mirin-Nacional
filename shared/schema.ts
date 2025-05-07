@@ -65,6 +65,34 @@ export const insertTweetSchema = createInsertSchema(tweets, {
 
 export const insertLikeSchema = createInsertSchema(likes).omit({ id: true, createdAt: true });
 
+export const comments = pgTable("comments", {
+  id: serial("id").primaryKey(),
+  content: text("content").notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  tweetId: integer("tweet_id").references(() => tweets.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+});
+
+export const reposts = pgTable("reposts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  tweetId: integer("tweet_id").references(() => tweets.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+});
+
+// Adicione as relações
+export const commentsRelations = relations(comments, ({ one }) => ({
+  user: one(users, { fields: [comments.userId], references: [users.id] }),
+  tweet: one(tweets, { fields: [comments.tweetId], references: [tweets.id] })
+}));
+
+export const repostsRelations = relations(reposts, ({ one }) => ({
+  user: one(users, { fields: [reposts.userId], references: [users.id] }),
+  tweet: one(tweets, { fields: [reposts.tweetId], references: [tweets.id] })
+}));
+
+export type Comment = typeof comments.$inferSelect;
+export type Repost = typeof reposts.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type UpdateUser = z.infer<typeof updateUserSchema>;
 export type User = typeof users.$inferSelect;

@@ -311,6 +311,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Internal server error" });
     }
   });
+app.post('/api/tweets/:id/comments', async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const tweetId = parseInt(req.params.id);
+    const { content } = req.body;
+
+    if (!content || content.length > 280) {
+      return res.status(400).json({ message: "Comentário inválido" });
+    }
+
+    const comment = await storage.createComment({
+      content,
+      userId: req.user.id,
+      tweetId
+    });
+
+    res.status(201).json(comment);
+  } catch (error) {
+    console.error("Error creating comment:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Repostar um tweet
+app.post('/api/tweets/:id/reposts', async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const tweetId = parseInt(req.params.id);
+    
+    // Verifica se já repostou
+    const existingRepost = await db.query.reposts.findFirst({
+      where: and(
+        eq(reposts.userId, req.user.id),
+        eq(reposts.tweetId, tweetId)
+      )
+    });
+
+    if (existingRepost) {
+      return res.status(400).json({ message: "Você já repostou este tweet" });
+    }
+
+    const repost = await storage.createRepost({
+      userId: req.user.id,
+      tweetId
+    });
+
+    res.status(201).json(repost);
+  } catch (error) {
+    console.error("Error creating repost:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Buscar comentários de um tweet
+app.get('/api/tweets/:id/comments', async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const tweetId = parseInt(req.params.id);
+    const comments = await storage.getComments(tweetId);
+    res.json(comments);
+  } catch (error) {
+    console.error("Error fetching comments:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Buscar reposts de um tweet
+app.get('/api/tweets/:id/reposts', async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const tweetId = parseInt(req.params.id);
+    const reposts = await storage.getReposts(tweetId);
+    res.json(reposts);
+  } catch (error) {
+    console.error("Error fetching reposts:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
 
   const httpServer = createServer(app);
 
