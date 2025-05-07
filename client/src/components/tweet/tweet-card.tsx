@@ -181,7 +181,7 @@ export function TweetCard({ tweet, isComment = false }: TweetCardProps) {
               className="flex items-center text-muted-foreground hover:text-primary"
             >
               <MessageSquare className="w-4 h-4 mr-1" />
-              <span>{comments.length}</span>
+              <span>{tweet.commentCount ?? comments.length}</span>
             </button>
 
             <button className="flex items-center text-muted-foreground hover:text-green-500">
@@ -225,7 +225,7 @@ export function TweetCard({ tweet, isComment = false }: TweetCardProps) {
           )}
 
           {!isComment && comments.length > 0 && (
-            <div className="border-l-2 border-gray-200 pl-4 mt-3 space-y-3">
+            <div className={`p-4 ${!isComment ? 'border-b border-border' : 'text-muted-foreground text-sm pl-12 border-l-2 border-border'}`}>
               {comments.map((comment) => (
                 <TweetCard key={comment.id} tweet={comment} isComment={true} />
               ))}

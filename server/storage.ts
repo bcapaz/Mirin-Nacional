@@ -84,6 +84,10 @@ export class DatabaseStorage implements IStorage {
       createdAt: tweets.createdAt,
       user: users,
       likeCount: sql<number>`count(${likes.id})`.mapWith(Number),
+      commentCount: sql<number>`(
+        SELECT count(*) FROM ${tweets} AS comments
+        WHERE comments.parentId = ${tweets.id}
+      )`.mapWith(Number),
       isLiked: sql<boolean>`CASE WHEN exists(
         select 1 from ${likes} where ${likes.tweetId} = ${tweets.id} and ${likes.userId} = ${currentUserId}
       ) THEN true ELSE false END`.mapWith(Boolean),
@@ -106,6 +110,10 @@ export class DatabaseStorage implements IStorage {
       createdAt: tweets.createdAt,
       user: users,
       likeCount: sql<number>`count(${likes.id})`.mapWith(Number),
+      commentCount: sql<number>`(
+  	SELECT count(*) FROM ${tweets} AS comments
+  	WHERE comments.parentId = ${tweets.id}
+      )`.mapWith(Number),
       isLiked: sql<boolean>`CASE WHEN exists(
         select 1 from ${likes} where ${likes.tweetId} = ${tweets.id} and ${likes.userId} = ${currentUserId}
       ) THEN true ELSE false END`.mapWith(Boolean),
@@ -120,7 +128,13 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async createTweet(tweet: { content: string; userId: number; mediaUrl?: string | null }): Promise<Tweet> {
+  async createTweet(tweet: {
+    content: string;
+    userId: number;
+    mediaUrl?: string | null;
+    parentId?: number;
+    isComment?: boolean;
+  }): Promise<Tweet> {
     const [newTweet] = await db.insert(tweets).values(tweet).returning();
     return newTweet;
   }
