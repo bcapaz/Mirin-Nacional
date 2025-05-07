@@ -10,6 +10,7 @@ import { z } from "zod";
 import { insertTweetSchema } from "@shared/schema";
 import { processFileUpload, getPublicFilePath } from "./uploads";
 import { comments, reposts } from "@shared/schema"; 
+import multer from 'multer';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configuração para servir arquivos estáticos
@@ -412,6 +413,20 @@ app.get('/api/tweets/:id/reposts', async (req, res) => {
   }
 });
 
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.post('/api/tweets', upload.single('media'), async (req, res) => {
+  try {
+    const { content, parentId } = req.body;
+    const mediaFile = req.file;
+
+    // Processar o tweet...
+    
+    res.status(201).json(newTweet);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
   const httpServer = createServer(app);
 

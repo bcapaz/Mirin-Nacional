@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { ImageIcon, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,64 +30,11 @@ export function TweetForm({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const formData = new FormData();
-      formData.append('content', content);
-      
-      if (media) {
-        formData.append('media', media);
-      }
-      
-      if (parentId) {
-        formData.append('parentId', parentId.toString());
-      }
-
-      const endpoint = parentId ? `/api/tweets/${parentId}/comments` : '/api/tweets';
-      return await apiRequest('POST', endpoint, formData, true);
-    },
-    onSuccess: () => {
-      setContent('');
-      setMedia(null);
-      setMediaPreview(null);
-      queryClient.invalidateQueries(['/api/tweets']);
-      if (parentId) {
-        queryClient.invalidateQueries([`/api/tweets/${parentId}/comments`]);
-      }
-      toast({
-        title: isComment ? 'Comentário publicado!' : 'Tweet publicado!',
-        description: isComment 
-          ? 'Seu comentário foi enviado com sucesso'
-          : 'Sua mensagem foi publicada'
-      });
-      onSuccess?.();
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Erro',
-        description: error.message || 'Falha ao publicar',
-        variant: 'destructive'
-      });
-    }
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!content.trim() && !media) {
-      toast({
-        title: 'Conteúdo vazio',
-        description: 'Escreva algo ou adicione uma mídia',
-        variant: 'destructive'
-      });
-      return;
-    }
-    mutation.mutate();
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validação do tamanho do arquivo (5MB máximo)
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: 'Arquivo muito grande',
@@ -98,6 +44,7 @@ export function TweetForm({
       return;
     }
 
+    // Validação do tipo de arquivo
     if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
       toast({
         title: 'Formato inválido',
@@ -119,6 +66,72 @@ export function TweetForm({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const { mutate: createPost, isLoading } = useMutation({
+    mutationFn: async () => {
+      const formData = new FormData();
+      formData.append('content', content);
+      
+      if (media) {
+        formData.append('media', media);
+      }
+      
+      if (parentId) {
+        formData.append('parentId', parentId.toString());
+      }
+
+      const endpoint = parentId ? `/api/tweets/${parentId}/comments` : '/api/tweets';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+        // Não definir Content-Type manualmente - o browser vai definir como multipart/form-data
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Falha ao publicar');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      setContent('');
+      setMedia(null);
+      setMediaPreview(null);
+      queryClient.invalidateQueries(['/api/tweets']);
+      if (parentId) {
+        queryClient.invalidateQueries([`/api/tweets/${parentId}/comments`]);
+      }
+      toast({
+        title: isComment ? 'Comentário publicado!' : 'Tweet publicado!',
+        description: isComment 
+          ? 'Seu comentário foi enviado com sucesso'
+          : 'Sua mensagem foi publicada'
+      });
+      onSuccess?.();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Falha ao publicar',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!content.trim() && !media) {
+      toast({
+        title: 'Conteúdo vazio',
+        description: 'Escreva algo ou adicione uma mídia',
+        variant: 'destructive'
+      });
+      return;
+    }
+    createPost();
   };
 
   if (!user) return null;
@@ -190,6 +203,7 @@ export function TweetForm({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="text-muted-foreground hover:text-primary p-1 rounded-full"
+                  disabled={isLoading}
                 >
                   <ImageIcon className="h-5 w-5" />
                 </button>
@@ -204,13 +218,17 @@ export function TweetForm({
               
               <Button
                 type="submit"
-                disabled={mutation.isLoading || (isOverLimit) || (!content.trim() && !media)}
+                disabled={isLoading || isOverLimit || (!content.trim() && !media)}
                 className="rounded-full px-4"
               >
-                {mutation.isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : null}
-                {isComment ? 'Comentar' : 'Publicar'}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Publicando...
+                  </>
+                ) : (
+                  isComment ? 'Comentar' : 'Publicar'
+                )}
               </Button>
             </div>
           </form>

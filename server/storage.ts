@@ -204,8 +204,7 @@ export class DatabaseStorage implements IStorage {
         columns: {
           id: true,
           username: true,
-          profileImage: true,
-          avatarColor: true
+          profileImage: true
         }
       }
     },
@@ -214,8 +213,8 @@ export class DatabaseStorage implements IStorage {
 
   return result.map(tweet => ({
     ...tweet,
-    isLiked: false, // Você pode preencher isso depois
-    likeCount: tweet.likeCount || 0
+    likeCount: tweet.likeCount || 0,
+    isLiked: false // Você pode preencher isso depois com a informação do usuário atual
   }));
   }
 
