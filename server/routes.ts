@@ -10,15 +10,6 @@ import { z } from "zod";
 import { insertTweetSchema } from "@shared/schema";
 import { processFileUpload, getPublicFilePath } from "./uploads";
 import { comments, reposts } from "@shared/schema"; 
-import multer from 'multer';
-
-// Configuração do multer
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB
-  }
-});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configuração para servir arquivos estáticos
@@ -28,7 +19,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
   
   // API routes
-
   // Get all tweets with user info and like count
   app.get("/api/tweets", async (req, res) => {
     try {
@@ -44,29 +34,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Create a new tweet (com suporte a upload de mídia)
-  app.post("/api/tweets", upload.single('media'), async (req, res) => {
+  // Create a new tweet
+  app.post("/api/tweets", async (req, res) => {
     try {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Unauthorized" });
       }
       
-      const { content } = req.body;
-      const mediaFile = req.file;
+      // Processar upload de arquivos
+      let content = "";
+      let mediaUrl = null;
       
-      if (!content && !mediaFile) {
+      try {
+        const { fields, files } = await processFileUpload(req);
+        content = fields.content || "";
+        
+        if (files.media) {
+          mediaUrl = files.media.path;
+        }
+      } catch (error) {
+        console.error("Error processing file upload:", error);
+        return res.status(400).json({ message: error.message || "Erro ao processar upload" });
+      }
+      
+      if (!content && !mediaUrl) {
         return res.status(400).json({ message: "Conteúdo ou mídia são obrigatórios" });
       }
       
       if (content && content.length > 280) {
         return res.status(400).json({ message: "Tweet excede 280 caracteres" });
-      }
-      
-      let mediaUrl = null;
-      if (mediaFile) {
-        // Aqui você implementaria o upload para S3/Cloud Storage
-        // Exemplo simplificado (apenas para desenvolvimento):
-        mediaUrl = `data:${mediaFile.mimetype};base64,${mediaFile.buffer.toString('base64')}`;
       }
       
       const newTweet = await storage.createTweet({
@@ -189,16 +185,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Endpoint para atualizar o perfil do usuário
-  app.post("/api/profile/update", upload.single('profileImage'), async (req, res) => {
+  app.post("/api/profile/update", async (req, res) => {
     try {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Unauthorized" });
       }
       
-      const { username, bio } = req.body;
-      const profileImage = req.file;
+      let username = "";
+      let bio = "";
+      let profileImage = null;
       
-      if (!username?.trim()) {
+      try {
+        const { fields, files } = await processFileUpload(req);
+        username = fields.username || "";
+        bio = fields.bio || "";
+        
+        if (files.profileImage) {
+          profileImage = files.profileImage.path;
+        }
+      } catch (error) {
+        console.error("Error processing profile update:", error);
+        return res.status(400).json({ message: error.message || "Erro ao processar upload" });
+      }
+      
+      if (!username.trim()) {
         return res.status(400).json({ message: "Nome de delegação é obrigatório" });
       }
       
@@ -210,16 +220,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      let profileImageUrl = null;
-      if (profileImage) {
-        profileImageUrl = `data:${profileImage.mimetype};base64,${profileImage.buffer.toString('base64')}`;
-      }
-      
       // Atualizar o perfil
       const updatedUser = await storage.updateUser(req.user.id, {
         username,
         bio,
-        profileImage: profileImageUrl
+        profileImage
       });
       
       return res.status(200).json(updatedUser);
@@ -308,107 +313,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Criar comentário em um tweet
-  app.post('/api/tweets/:id/comments', upload.single('media'), async (req, res) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ error: "Não autenticado" });
-      }
+app.post('/api/tweets/:id/comments', async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Não autenticado" });
+  }
 
-      const { content } = req.body;
-      const tweetId = parseInt(req.params.id);
-      const mediaFile = req.file;
+  const { content } = req.body;
+  const tweetId = parseInt(req.params.id);
 
-      if (!content?.trim() && !mediaFile) {
-        return res.status(400).json({ error: "Conteúdo ou mídia são obrigatórios" });
-      }
+  if (!content || !tweetId) {
+    return res.status(400).json({ error: "Dados inválidos" });
+  }
 
-      let mediaUrl = null;
-      if (mediaFile) {
-        mediaUrl = `data:${mediaFile.mimetype};base64,${mediaFile.buffer.toString('base64')}`;
-      }
+  try {
+    const comment = await storage.createComment({
+      content,
+      userId: req.user.id,
+      tweetId
+    });
+    res.status(201).json(comment);
+  } catch (error) {
+    console.error("Erro ao criar comentário:", error);
+    res.status(500).json({ 
+      error: "Erro ao criar comentário",
+      details: error.message 
+    });
+  }
+});
 
-      const comment = await storage.createComment({
-        content,
-        userId: req.user.id,
-        tweetId,
-        mediaUrl
-      });
-      
-      res.status(201).json(comment);
-    } catch (error) {
-      console.error("Erro ao criar comentário:", error);
-      res.status(500).json({ 
-        error: "Erro ao criar comentário",
-        details: error.message 
-      });
+// Repostar um tweet
+app.post('/api/tweets/:id/reposts', async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
-  });
 
-  // Buscar comentários de um tweet
-  app.get('/api/tweets/:id/comments', async (req, res) => {
-    try {
-      const tweetId = parseInt(req.params.id);
-      if (isNaN(tweetId)) {
-        return res.status(400).json({ error: "ID do tweet inválido" });
-      }
+    const tweetId = parseInt(req.params.id);
+    
+    // Verifica se já repostou
+    const existingRepost = await db.query.reposts.findFirst({
+      where: and(
+        eq(reposts.userId, req.user.id),
+        eq(reposts.tweetId, tweetId)
+      )
+    });
 
-      const comments = await storage.getComments(tweetId);
-      
-      res.json({
-        success: true,
-        count: comments.length,
-        comments
-      });
-    } catch (error) {
-      console.error("Erro ao buscar comentários:", error);
-      res.status(500).json({ error: "Erro interno ao carregar comentários" });
+    if (existingRepost) {
+      return res.status(400).json({ message: "Você já repostou este tweet" });
     }
-  });
 
-  // Repostar um tweet
-  app.post('/api/tweets/:id/reposts', async (req, res) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
+    const repost = await storage.createRepost({
+      userId: req.user.id,
+      tweetId
+    });
 
-      const tweetId = parseInt(req.params.id);
-      
-      // Verifica se já repostou
-      const existingRepost = await storage.getRepost(req.user.id, tweetId);
+    res.status(201).json(repost);
+  } catch (error) {
+    console.error("Error creating repost:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
 
-      if (existingRepost) {
-        return res.status(400).json({ message: "Você já repostou este tweet" });
-      }
-
-      const repost = await storage.createRepost({
-        userId: req.user.id,
-        tweetId
-      });
-
-      res.status(201).json(repost);
-    } catch (error) {
-      console.error("Error creating repost:", error);
-      res.status(500).json({ message: "Internal server error" });
+// Buscar comentários de um tweet
+app.get('/api/tweets/:id/comments', async (req, res) => {
+  try {
+    const tweetId = parseInt(req.params.id);
+    const comments = await storage.getComments(tweetId);
+    
+    // Adicione esta verificação
+    if (!comments) {
+      return res.status(404).json({ error: "Tweet não encontrado" });
     }
-  });
 
-  // Buscar reposts de um tweet
-  app.get('/api/tweets/:id/reposts', async (req, res) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
+    res.json({
+      success: true,
+      count: comments.length,
+      comments
+    });
+  } catch (error) {
+    console.error("Erro ao buscar comentários:", error);
+    res.status(500).json({ error: "Erro interno ao carregar comentários" });
+  }
+});
 
-      const tweetId = parseInt(req.params.id);
-      const reposts = await storage.getReposts(tweetId);
-      res.json(reposts);
-    } catch (error) {
-      console.error("Error fetching reposts:", error);
-      res.status(500).json({ message: "Internal server error" });
+// Buscar reposts de um tweet
+app.get('/api/tweets/:id/reposts', async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
-  });
+
+    const tweetId = parseInt(req.params.id);
+    const reposts = await storage.getReposts(tweetId);
+    res.json(reposts);
+  } catch (error) {
+    console.error("Error fetching reposts:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 
   const httpServer = createServer(app);
 
