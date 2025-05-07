@@ -5,12 +5,12 @@ import { relations } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(), // Now represents "Nome de Delegação"
+  username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  name: text("name").notNull(), // Full name (hidden from public)
-  bio: text("bio"), // Optional user biography
-  profileImage: text("profile_image"), // URL to profile image
-  avatarColor: text("avatar_color").notNull().default("#009c3b"), // Default to brazil-green
+  name: text("name").notNull(),
+  bio: text("bio"),
+  profileImage: text("profile_image"),
+  avatarColor: text("avatar_color").notNull().default("#009c3b"),
   isAdmin: boolean("is_admin").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull()
 });
@@ -18,11 +18,12 @@ export const users = pgTable("users", {
 export const tweets = pgTable("tweets", {
   id: serial("id").primaryKey(),
   content: text("content").notNull(),
-  mediaUrl: text("media_url"), // URL to media (image/video)
+  mediaUrl: text("media_url"),
   userId: integer("user_id").references(() => users.id).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull()
-  parentId: integer("parent_id").references(() => tweets.id), // Para comentários hierárquicos
-  isComment: boolean("is_comment").default(false) // Identifica se é um comentário
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  parentId: integer("parent_id").references(() => tweets.id),
+  isComment: boolean("is_comment").default(false),
+  likeCount: integer("like_count").default(0)
 });
 
 export const likes = pgTable("likes", {
@@ -32,20 +33,57 @@ export const likes = pgTable("likes", {
   createdAt: timestamp("created_at").defaultNow().notNull()
 });
 
+export const comments = pgTable("comments", {
+  id: serial("id").primaryKey(),
+  content: text("content").notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  tweetId: integer("tweet_id").references(() => tweets.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+});
+
+export const reposts = pgTable("reposts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  tweetId: integer("tweet_id").references(() => tweets.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   tweets: many(tweets),
-  likes: many(likes)
+  likes: many(likes),
+  comments: many(comments),
+  reposts: many(reposts)
 }));
 
 export const tweetsRelations = relations(tweets, ({ one, many }) => ({
   user: one(users, { fields: [tweets.userId], references: [users.id] }),
-  likes: many(likes)
+  likes: many(likes),
+  comments: many(comments),
+  reposts: many(reposts),
+  parent: one(tweets, {
+    fields: [tweets.parentId],
+    references: [tweets.id],
+    relationName: "tweet_replies"
+  }),
+  replies: many(tweets, {
+    relationName: "tweet_replies"
+  })
 }));
 
 export const likesRelations = relations(likes, ({ one }) => ({
   user: one(users, { fields: [likes.userId], references: [users.id] }),
   tweet: one(tweets, { fields: [likes.tweetId], references: [tweets.id] })
+}));
+
+export const commentsRelations = relations(comments, ({ one }) => ({
+  user: one(users, { fields: [comments.userId], references: [users.id] }),
+  tweet: one(tweets, { fields: [comments.tweetId], references: [tweets.id] })
+}));
+
+export const repostsRelations = relations(reposts, ({ one }) => ({
+  user: one(users, { fields: [reposts.userId], references: [users.id] }),
+  tweet: one(tweets, { fields: [reposts.tweetId], references: [tweets.id] })
 }));
 
 // Schemas
@@ -67,38 +105,35 @@ export const insertTweetSchema = createInsertSchema(tweets, {
 
 export const insertLikeSchema = createInsertSchema(likes).omit({ id: true, createdAt: true });
 
-export const comments = pgTable("comments", {
-  id: serial("id").primaryKey(),
-  content: text("content").notNull(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  tweetId: integer("tweet_id").references(() => tweets.id).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull()
-});
+export const insertCommentSchema = createInsertSchema(comments, {
+  content: (schema) => schema.max(280, "Comentário deve ter menos de 280 caracteres")
+}).omit({ id: true, createdAt: true });
 
-export const reposts = pgTable("reposts", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  tweetId: integer("tweet_id").references(() => tweets.id).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull()
-});
+export const insertRepostSchema = createInsertSchema(reposts).omit({ id: true, createdAt: true });
 
-// Adicione as relações
-export const commentsRelations = relations(comments, ({ one }) => ({
-  user: one(users, { fields: [comments.userId], references: [users.id] }),
-  tweet: one(tweets, { fields: [comments.tweetId], references: [tweets.id] })
-}));
-
-export const repostsRelations = relations(reposts, ({ one }) => ({
-  user: one(users, { fields: [reposts.userId], references: [users.id] }),
-  tweet: one(tweets, { fields: [reposts.tweetId], references: [tweets.id] })
-}));
-
-export type Comment = typeof comments.$inferSelect;
-export type Repost = typeof reposts.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type UpdateUser = z.infer<typeof updateUserSchema>;
+// Types
 export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
 export type Tweet = typeof tweets.$inferSelect;
+export type NewTweet = typeof tweets.$inferInsert;
 export type Like = typeof likes.$inferSelect;
+export type NewLike = typeof likes.$inferInsert;
+export type Comment = typeof comments.$inferSelect;
+export type NewComment = typeof comments.$inferInsert;
+export type Repost = typeof reposts.$inferSelect;
+export type NewRepost = typeof reposts.$inferInsert;
 
-export type TweetWithUser = Tweet & { user: User, likeCount: number, isLiked?: boolean };
+export type TweetWithUser = Tweet & {
+  user: Pick<User, 'id' | 'username' | 'profileImage' | 'avatarColor'>;
+  isLiked?: boolean;
+  comments?: CommentWithUser[];
+  reposts?: RepostWithUser[];
+};
+
+export type CommentWithUser = Comment & {
+  user: Pick<User, 'id' | 'username' | 'profileImage' | 'avatarColor'>;
+};
+
+export type RepostWithUser = Repost & {
+  user: Pick<User, 'id' | 'username' | 'profileImage' | 'avatarColor'>;
+};
