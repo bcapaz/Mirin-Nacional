@@ -22,8 +22,8 @@ export interface IStorage {
   getRandomUsers(excludeUserId: number, limit: number): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
   sessionStore: session.Store;
-  createComment(comment: { content: string; userId: number; tweetId: number }): Promise<Comment>;
-  createRepost(repost: { userId: number; tweetId: number }): Promise<Repost>;
+  createComment: (comment: { content: string; userId: number; tweetId: number }) => Promise<Comment>;
+  createRepost: (repost: { userId: number; tweetId: number }) => Promise<Repost>;
   getComments(tweetId: number): Promise<(Comment & { user: User })[]>;
   getReposts(tweetId: number): Promise<(Repost & { user: User })[]>;
 }
@@ -180,12 +180,12 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-async createComment(comment: { content: string; userId: number; tweetId: number }): Promise<Comment> {
+createComment = async (comment: { content: string; userId: number; tweetId: number }): Promise<Comment> => {
   const [newComment] = await db.insert(comments).values(comment).returning();
   return newComment;
 }
 
-async createRepost(repost: { userId: number; tweetId: number }): Promise<Repost> {
+createRepost = async (repost: { userId: number; tweetId: number }): Promise<Repost> => {
   const [newRepost] = await db.insert(reposts).values(repost).returning();
   return newRepost;
 }
