@@ -69,7 +69,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content,
         userId: req.user.id,
         mediaUrl
-      });
+    });
       
       return res.status(201).json(newTweet);
     } catch (error) {
@@ -338,7 +338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
     res.status(201).json(comment);
-  } catch (error) {
+    } catch (error) {
     console.error("Erro ao criar comentário:", error);
       res.status(500).json({ message: "Erro interno ao criar comentário" });
     }
@@ -377,7 +377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-// Buscar comentários de um tweet
+  // Buscar comentários de um tweet
   app.get('/api/tweets/:id/comments', async (req, res) => {
     try {
       const tweetId = parseInt(req.params.id);

@@ -93,6 +93,7 @@ export class DatabaseStorage implements IStorage {
       ) THEN true ELSE false END`.mapWith(Boolean),
     })
     .from(tweets)
+    .where(or(eq(tweets.isComment, false), isNull(tweets.isComment)))
     .leftJoin(users, eq(tweets.userId, users.id))
     .leftJoin(likes, eq(tweets.id, likes.tweetId))
     .groupBy(tweets.id, users.id)
