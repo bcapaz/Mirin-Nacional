@@ -20,9 +20,9 @@ export default function HomePage() {
           {/* Main Feed */}
           <div className="flex-1">
             {/* Header */}
-            <header className="sticky top-0 z-10 bg-white border-b border-gray-200">
+            <header className="sticky top-0 z-10 bg-blue border-b border-gray-200">
               <div className="px-4 py-3">
-                <h2 className="text-xl font-bold text-[#002776]">Twitter dos Delegados</h2>
+                <h2 className="text-xl font-bold text-[#00]">Twitter dos Delegados</h2>
                 <p className="text-sm text-gray-500">Discuta a greve dos caminhoneiros de 2018</p>
               </div>
             </header>

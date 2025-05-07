@@ -82,7 +82,7 @@ export default function AuthPage() {
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-white">Twitter dos Delegados</h1>
-            <p className="text-gray-300 mt-2">Site Nacional Mirim</p>
+            <p className="text-gray-300 mt-2">Site Nacional Mirin</p>
           </div>
 
           <div className="bg-[#001d5e] rounded-lg shadow-md p-8 text-white">
@@ -224,7 +224,7 @@ export default function AuthPage() {
 
           <p className="mt-8 text-center text-sm text-gray-300">
             <a href="https://sites.google.com/view/sitenacionalmirim/in%C3%ADcio" className="text-[#ffdf00] hover:underline">
-              Voltar ao Site Nacional Mirim
+              Voltar ao Site Nacional Mirin
             </a>
           </p>
         </div>

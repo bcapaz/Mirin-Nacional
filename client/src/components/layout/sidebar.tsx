@@ -96,7 +96,7 @@ export function Sidebar() {
         <div className="flex flex-col h-full">
           <div className="p-4 border-b border-border">
             <div className="flex items-center justify-between">
-              <h1 className="text-xl font-bold text-foreground">Site Nacional Mirim</h1>
+              <h1 className="text-xl font-bold text-foreground">Site Nacional Mirin</h1>
               <button 
                 className="md:hidden text-foreground"
                 onClick={toggleMobileMenu}
