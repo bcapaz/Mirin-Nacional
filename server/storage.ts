@@ -22,10 +22,10 @@ export interface IStorage {
   getRandomUsers(excludeUserId: number, limit: number): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
   sessionStore: session.Store;
-  createComment: (comment: { content: string; userId: number; tweetId: number }) => Promise<Comment>;
-  createRepost: (repost: { userId: number; tweetId: number }) => Promise<Repost>;
-  getComments: (tweetId: number) => Promise<(Comment & { user: User })[]>;
-  getReposts: (tweetId: number) => Promise<(Repost & { user: User })[]>;
+  createComment(comment: { content: string; userId: number; tweetId: number }): Promise<Comment>;
+  createRepost(repost: { userId: number; tweetId: number }): Promise<Repost>;
+  getComments(tweetId: number): Promise<(Comment & { user: User })[]>;
+  getReposts(tweetId: number): Promise<(Repost & { user: User })[]>;
 }
 
 const PostgresSessionStore = connectPg(session);
@@ -178,33 +178,31 @@ export class DatabaseStorage implements IStorage {
     const result = await db.select().from(users).orderBy(users.username);
     return result;
   }
+
+  async createComment(comment: { content: string; userId: number; tweetId: number }): Promise<Comment> {
+    const [newComment] = await db.insert(comments).values(comment).returning();
+    return newComment;
+  }
+
+  async createRepost(repost: { userId: number; tweetId: number }): Promise<Repost> {
+    const [newRepost] = await db.insert(reposts).values(repost).returning();
+    return newRepost;
+  }
+
+  async getComments(tweetId: number): Promise<(Comment & { user: User })[]> {
+    return await db.select()
+      .from(comments)
+      .leftJoin(users, eq(comments.userId, users.id))
+      .where(eq(comments.tweetId, tweetId))
+      .orderBy(desc(comments.createdAt));
+  }
+
+  async getReposts(tweetId: number): Promise<(Repost & { user: User })[]> {
+    return await db.select()
+      .from(reposts)
+      .leftJoin(users, eq(reposts.userId, users.id))
+      .where(eq(reposts.tweetId, tweetId))
+      .orderBy(desc(reposts.createdAt));
+  }
 }
-
-  createComment = async (comment: { content: string; userId: number; tweetId: number }): Promise<Comment> => {
-  const [newComment] = await db.insert(comments).values(comment).returning();
-  return newComment;
-};
-
-
-  createRepost = async (repost: { userId: number; tweetId: number }): Promise<Repost> => {
-  const [newRepost] = await db.insert(reposts).values(repost).returning();
-  return newRepost;
-};
-
-  getComments = async (tweetId: number): Promise<(Comment & { user: User })[]> => {
-  return await db.select()
-    .from(comments)
-    .leftJoin(users, eq(comments.userId, users.id))
-    .where(eq(comments.tweetId, tweetId))
-    .orderBy(desc(comments.createdAt));
-};
-
-  getReposts = async (tweetId: number): Promise<(Repost & { user: User })[]> => {
-  return await db.select()
-    .from(reposts)
-    .leftJoin(users, eq(reposts.userId, users.id))
-    .where(eq(reposts.tweetId, tweetId))
-    .orderBy(desc(reposts.createdAt));
-};
-
 export const storage = new DatabaseStorage();
