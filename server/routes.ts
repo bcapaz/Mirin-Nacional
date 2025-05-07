@@ -9,6 +9,7 @@ import { tweets, likes, users } from "@shared/schema";
 import { z } from "zod";
 import { insertTweetSchema } from "@shared/schema";
 import { processFileUpload, getPublicFilePath } from "./uploads";
+import { comments, reposts } from "@shared/schema"; 
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configuração para servir arquivos estáticos
@@ -311,29 +312,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Internal server error" });
     }
   });
+
 app.post('/api/tweets/:id/comments', async (req, res) => {
   try {
     if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Unauthorized" });
+      return res.status(401).json({ error: "Não autenticado" }); // Mensagem mais clara
     }
 
     const tweetId = parseInt(req.params.id);
     const { content } = req.body;
 
-    if (!content || content.length > 280) {
-      return res.status(400).json({ message: "Comentário inválido" });
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({ error: "Conteúdo do comentário é obrigatório" });
+    }
+
+    if (content.length > 280) {
+      return res.status(400).json({ error: "Comentário excede 280 caracteres" });
     }
 
     const comment = await storage.createComment({
-      content,
+      content: content.trim(),
       userId: req.user.id,
       tweetId
     });
 
     res.status(201).json(comment);
   } catch (error) {
-    console.error("Error creating comment:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Erro ao criar comentário:", error);
+    res.status(500).json({ error: "Erro interno ao processar comentário" });
   }
 });
 
@@ -373,16 +379,22 @@ app.post('/api/tweets/:id/reposts', async (req, res) => {
 // Buscar comentários de um tweet
 app.get('/api/tweets/:id/comments', async (req, res) => {
   try {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const tweetId = parseInt(req.params.id);
     const comments = await storage.getComments(tweetId);
-    res.json(comments);
+    
+    // Adicione esta verificação
+    if (!comments) {
+      return res.status(404).json({ error: "Tweet não encontrado" });
+    }
+
+    res.json({
+      success: true,
+      count: comments.length,
+      comments
+    });
   } catch (error) {
-    console.error("Error fetching comments:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Erro ao buscar comentários:", error);
+    res.status(500).json({ error: "Erro interno ao carregar comentários" });
   }
 });
 
@@ -401,6 +413,7 @@ app.get('/api/tweets/:id/reposts', async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
 
   const httpServer = createServer(app);
 

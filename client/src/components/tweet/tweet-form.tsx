@@ -8,7 +8,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ImageIcon, X, Video } from "lucide-react";
 
-export function TweetForm() {
+interface TweetFormProps {
+  parentId?: number;
+  onSuccess?: () => void;
+  autoFocus?: boolean;
+  placeholder?: string;
+  isComment?: boolean;
+}
+
+export function TweetForm({
+  parentId,
+  onSuccess,
+  autoFocus = false,
+  placeholder = "O que está acontecendo?",
+  isComment = false
+}: TweetFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [content, setContent] = useState("");
@@ -25,9 +39,15 @@ export function TweetForm() {
         formData.append("media", media);
       }
       
-      const response = await fetch("/api/tweets", {
+      if (parentId) {
+        formData.append("parentId", parentId.toString());
+      }
+      
+      const endpoint = parentId ? `/api/tweets/${parentId}/comments` : "/api/tweets";
+      const response = await fetch(endpoint, {
         method: "POST",
         body: formData,
+        credentials: "include"
       });
       
       if (!response.ok) {
@@ -42,10 +62,16 @@ export function TweetForm() {
       setMedia(null);
       setMediaPreview(null);
       queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
+      if (parentId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/tweets/${parentId}/comments`] });
+      }
       toast({
-        title: "Publicação enviada!",
-        description: "Sua mensagem foi publicada com sucesso.",
+        title: isComment ? "Comentário enviado!" : "Publicação enviada!",
+        description: isComment 
+          ? "Seu comentário foi publicado com sucesso." 
+          : "Sua mensagem foi publicada com sucesso.",
       });
+      onSuccess?.();
     },
     onError: (error: Error) => {
       toast({
@@ -83,7 +109,6 @@ export function TweetForm() {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Verificar tamanho (máximo 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "Arquivo muito grande",
@@ -93,7 +118,6 @@ export function TweetForm() {
       return;
     }
     
-    // Verificar tipo (apenas imagens e vídeos)
     if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
       toast({
         title: "Tipo de arquivo não suportado",
@@ -126,7 +150,7 @@ export function TweetForm() {
   const isWarning = charCount > 240 && charCount <= 280;
 
   return (
-    <div className="p-4 border-b border-border bg-card text-card-foreground">
+    <div className={`p-4 ${isComment ? "" : "border border-border rounded-lg mb-4"} bg-card text-card-foreground`}>
       <div className="flex space-x-4">
         <div className="flex-shrink-0">
           <UserAvatar user={user} size="md" />
@@ -137,24 +161,23 @@ export function TweetForm() {
               id="tweetContent"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              rows={3}
-              className="w-full p-3 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:outline-none resize-none bg-background text-foreground"
-              placeholder="O que está acontecendo?"
+              rows={isComment ? 2 : 3}
+              className="w-full p-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:outline-none resize-none bg-background text-foreground text-sm"
+              placeholder={placeholder}
+              autoFocus={autoFocus}
             />
             
             {mediaPreview && (
-              <div className="relative mt-2 mb-3">
-                <div className="rounded-lg overflow-hidden border border-border">
-                  {media?.type.startsWith("image/") ? (
-                    <img src={mediaPreview} alt="Preview" className="max-h-80 w-auto mx-auto" />
-                  ) : (
-                    <video src={mediaPreview} controls className="max-h-80 w-auto mx-auto" />
-                  )}
-                </div>
+              <div className="relative mt-2 mb-3 rounded-lg overflow-hidden border border-border bg-background">
+                {media?.type.startsWith("image/") ? (
+                  <img src={mediaPreview} alt="Preview" className="max-h-80 w-full object-contain" />
+                ) : (
+                  <video src={mediaPreview} controls className="max-h-80 w-full" />
+                )}
                 <button 
                   type="button"
                   onClick={handleRemoveMedia}
-                  className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-1 hover:bg-opacity-70"
+                  className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
                 >
                   <X size={16} />
                 </button>
@@ -162,38 +185,44 @@ export function TweetForm() {
             )}
             
             <div className="flex items-center justify-between mt-3">
-              <div className="flex space-x-2">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  accept="image/*,video/*"
-                  className="hidden"
-                  id="mediaUpload"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-accent hover:text-accent-foreground"
-                  title="Adicionar mídia"
-                >
-                  <ImageIcon size={20} />
-                </Button>
-                <div className={`text-sm ${isLimitReached ? 'text-destructive' : isWarning ? 'text-yellow-500' : 'text-muted-foreground'}`}>
-                  <span id="charCount">{charCount}</span>/280
-                </div>
+              <div className="flex items-center space-x-3">
+                {!isComment && (
+                  <>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      accept="image/*,video/*"
+                      className="hidden"
+                      id="mediaUpload"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-muted-foreground hover:text-primary"
+                      title="Adicionar mídia"
+                    >
+                      <ImageIcon size={18} className="mr-1" />
+                      Mídia
+                    </Button>
+                  </>
+                )}
+                <span className={`text-xs ${isLimitReached ? 'text-destructive' : isWarning ? 'text-yellow-500' : 'text-muted-foreground'}`}>
+                  {charCount}/280
+                </span>
               </div>
               <Button
                 type="submit"
-                className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full"
+                size="sm"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-4"
                 disabled={tweetMutation.isPending || isLimitReached || (!content.trim() && !media)}
               >
                 {tweetMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 ) : null}
-                Publicar
+                {isComment ? "Comentar" : "Publicar"}
               </Button>
             </div>
           </form>

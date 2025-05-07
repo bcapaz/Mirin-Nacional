@@ -21,6 +21,8 @@ export const tweets = pgTable("tweets", {
   mediaUrl: text("media_url"), // URL to media (image/video)
   userId: integer("user_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull()
+  parentId: integer("parent_id").references(() => tweets.id), // Para comentários hierárquicos
+  isComment: boolean("is_comment").default(false) // Identifica se é um comentário
 });
 
 export const likes = pgTable("likes", {
