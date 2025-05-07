@@ -314,32 +314,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 app.post('/api/tweets/:id/comments', async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Não autenticado" });
+  }
+
+  const { content } = req.body;
+  const tweetId = parseInt(req.params.id);
+
+  if (!content || !tweetId) {
+    return res.status(400).json({ error: "Dados inválidos" });
+  }
+
   try {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ error: "Não autenticado" }); // Mensagem mais clara
-    }
-
-    const tweetId = parseInt(req.params.id);
-    const { content } = req.body;
-
-    if (!content || content.trim().length === 0) {
-      return res.status(400).json({ error: "Conteúdo do comentário é obrigatório" });
-    }
-
-    if (content.length > 280) {
-      return res.status(400).json({ error: "Comentário excede 280 caracteres" });
-    }
-
     const comment = await storage.createComment({
-      content: content.trim(),
+      content,
       userId: req.user.id,
       tweetId
     });
-
     res.status(201).json(comment);
   } catch (error) {
     console.error("Erro ao criar comentário:", error);
-    res.status(500).json({ error: "Erro interno ao processar comentário" });
+    res.status(500).json({ 
+      error: "Erro ao criar comentário",
+      details: error.message 
+    });
   }
 });
 

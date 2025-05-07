@@ -123,11 +123,20 @@ export type NewComment = typeof comments.$inferInsert;
 export type Repost = typeof reposts.$inferSelect;
 export type NewRepost = typeof reposts.$inferInsert;
 
-export type TweetWithUser = Tweet & {
-  user: Pick<User, 'id' | 'username' | 'profileImage' | 'avatarColor'>;
+export type TweetWithUser = {
+  id: number;
+  content: string;
+  userId: number;
+  createdAt: string;
+  parentId?: number;
+  isComment?: boolean;
+  user: {
+    id: number;
+    username: string;
+    profileImage?: string;
+  };
+  likeCount?: number;
   isLiked?: boolean;
-  comments?: CommentWithUser[];
-  reposts?: RepostWithUser[];
 };
 
 export type CommentWithUser = Comment & {

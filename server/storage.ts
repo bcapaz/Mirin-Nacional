@@ -179,40 +179,50 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-async createComment(comment: {
+  async createComment(comment: {
   content: string;
   userId: number;
-  tweetId: number; // ID do tweet original
-}): Promise<Tweet> {
+  tweetId: number;
+  }): Promise<Tweet> {
   const [newComment] = await db.insert(tweets).values({
     content: comment.content,
     userId: comment.userId,
-    parentId: comment.tweetId,
-    isComment: true
+    parentId: comment.tweetId,  // Isso referencia o tweet original
+    isComment: true,
+    createdAt: new Date(),
+    likeCount: 0
   }).returning();
   
   return newComment;
-}
+  }
+
+  async getComments(tweetId: number): Promise<TweetWithUser[]> {
+  const result = await db.query.tweets.findMany({
+    where: (tweets, { eq }) => eq(tweets.parentId, tweetId),
+    with: {
+      user: {
+        columns: {
+          id: true,
+          username: true,
+          profileImage: true,
+          avatarColor: true
+        }
+      }
+    },
+    orderBy: (tweets, { desc }) => [desc(tweets.createdAt)]
+  });
+
+  return result.map(tweet => ({
+    ...tweet,
+    isLiked: false, // Você pode preencher isso depois
+    likeCount: tweet.likeCount || 0
+  }));
+  }
 
   async createRepost(repost: { userId: number; tweetId: number }): Promise<Repost> {
     const [newRepost] = await db.insert(reposts).values(repost).returning();
     return newRepost;
   }
-
-async getComments(tweetId: number): Promise<TweetWithUser[]> {
-  return await db.select({
-    id: tweets.id,
-    content: tweets.content,
-    userId: tweets.userId,
-    createdAt: tweets.createdAt,
-    user: users,
-    // ... outros campos necessários ...
-  })
-  .from(tweets)
-  .leftJoin(users, eq(tweets.userId, users.id))
-  .where(eq(tweets.parentId, tweetId))
-  .orderBy(desc(tweets.createdAt));
-}
 
   async getReposts(tweetId: number): Promise<(Repost & { user: User })[]> {
     return await db.select()
