@@ -26,7 +26,10 @@ export function TweetCard({ tweet }: TweetCardProps) {
   const { toast } = useToast();
   const [mediaOpen, setMediaOpen] = useState(false);
   const [comments, setComments] = useState([]);
-  const [showComments, setShowComments] = useState(false);
+
+  useEffect(() => {
+    fetchComments();
+  }, []);
 
   const fetchComments = async () => {
     try {
@@ -142,17 +145,14 @@ export function TweetCard({ tweet }: TweetCardProps) {
             )}
 
             <div className="mt-3 flex items-center space-x-8">
-              <button className="flex items-center text-muted-foreground hover:text-primary" onClick={() => {
-                if (!showComments) fetchComments();
-                setShowComments(!showComments);
-              }}>
+              <div className="flex items-center text-muted-foreground">
                 <MessageSquare className="w-4 h-4 mr-1" />
                 <span>{tweet.commentCount ?? 0}</span>
-              </button>
-              <button className="flex items-center text-muted-foreground hover:text-accent">
+              </div>
+              <div className="flex items-center text-muted-foreground">
                 <Repeat2 className="w-4 h-4 mr-1" />
                 <span>{tweet.repostCount ?? 0}</span>
-              </button>
+              </div>
               <button 
                 className={`flex items-center ${tweet.isLiked ? 'text-red-500' : 'text-muted-foreground hover:text-red-500'}`}
                 onClick={handleLikeClick}
@@ -163,7 +163,7 @@ export function TweetCard({ tweet }: TweetCardProps) {
               </button>
             </div>
 
-            {showComments && comments.length > 0 && (
+            {comments.length > 0 && (
               <div className="ml-6 mt-4 space-y-2 border-l border-muted pl-4">
                 {comments.map((comment) => (
                   <div key={comment.id} className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-2">
