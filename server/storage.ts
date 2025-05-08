@@ -86,19 +86,19 @@ export class DatabaseStorage implements IStorage {
       likeCount: sql<number>`count(${likes.id})`.mapWith(Number),
       commentCount: sql<number>`(
         SELECT count(*) FROM ${tweets} AS comments
-        WHERE comments.parentId = ${tweets.id}
+        WHERE comments.parent_id = ${tweets.id}
       )`.mapWith(Number),
       isLiked: sql<boolean>`CASE WHEN exists(
         select 1 from ${likes} where ${likes.tweetId} = ${tweets.id} and ${likes.userId} = ${currentUserId}
       ) THEN true ELSE false END`.mapWith(Boolean),
     })
     .from(tweets)
-    .where(or(eq(tweets.isComment, false), isNull(tweets.isComment)))
+    .where(sql`${tweets.isComment} IS NOT TRUE`)
     .leftJoin(users, eq(tweets.userId, users.id))
     .leftJoin(likes, eq(tweets.id, likes.tweetId))
     .groupBy(tweets.id, users.id)
     .orderBy(desc(tweets.createdAt));
-    
+
     return result;
   }
 
