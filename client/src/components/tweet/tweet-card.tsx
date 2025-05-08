@@ -26,6 +26,8 @@ export function TweetCard({ tweet }: TweetCardProps) {
   const { toast } = useToast();
   const [mediaOpen, setMediaOpen] = useState(false);
   const [comments, setComments] = useState([]);
+  const [showCommentBox, setShowCommentBox] = useState(false);
+  const [commentText, setCommentText] = useState("");
 
   useEffect(() => {
     fetchComments();
@@ -38,6 +40,20 @@ export function TweetCard({ tweet }: TweetCardProps) {
       setComments(data.comments || []);
     } catch (err) {
       console.error("Erro ao carregar comentários:", err);
+    }
+  };
+
+  const handleCommentSubmit = async () => {
+    if (!commentText.trim()) return;
+    try {
+      const res = await apiRequest("POST", `/api/tweets/${tweet.id}/comments`, {
+        content: commentText.trim(),
+      });
+      setCommentText("");
+      setShowCommentBox(false);
+      fetchComments();
+    } catch (err) {
+      console.error("Erro ao comentar:", err);
     }
   };
 
@@ -145,10 +161,13 @@ export function TweetCard({ tweet }: TweetCardProps) {
             )}
 
             <div className="mt-3 flex items-center space-x-8">
-              <div className="flex items-center text-muted-foreground">
+              <button 
+                className="flex items-center text-muted-foreground hover:text-primary"
+                onClick={() => setShowCommentBox(!showCommentBox)}
+              >
                 <MessageSquare className="w-4 h-4 mr-1" />
                 <span>{tweet.commentCount ?? 0}</span>
-              </div>
+              </button>
               <div className="flex items-center text-muted-foreground">
                 <Repeat2 className="w-4 h-4 mr-1" />
                 <span>{tweet.repostCount ?? 0}</span>
@@ -162,6 +181,23 @@ export function TweetCard({ tweet }: TweetCardProps) {
                 <span>{tweet.likeCount}</span>
               </button>
             </div>
+
+            {showCommentBox && user && (
+              <div className="mt-4">
+                <textarea
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Escreva um comentário..."
+                  className="w-full p-2 border rounded-md bg-background text-foreground"
+                />
+                <button 
+                  onClick={handleCommentSubmit}
+                  className="mt-2 bg-primary text-white px-4 py-1 rounded-md hover:bg-primary/90"
+                >
+                  Comentar
+                </button>
+              </div>
+            )}
 
             {comments.length > 0 && (
               <div className="ml-6 mt-4 space-y-2 border-l border-muted pl-4">
