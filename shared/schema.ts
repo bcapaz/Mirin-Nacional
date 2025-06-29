@@ -24,8 +24,7 @@ export const tweets = pgTable("tweets", {
   parentId: integer("parent_id").references(() => tweets.id),
   isComment: boolean("is_comment").default(false),
   likeCount: integer("like_count").default(0),
-  // --- ADICIONADO ---
-  // Para contar os reposts de forma eficiente, similar ao likeCount.
+  // --- MUDANÇA 1 de 3: Adicionar contador de reposts ---
   repostCount: integer("repost_count").default(0)
 });
 
@@ -51,13 +50,12 @@ export const reposts = pgTable("reposts", {
   createdAt: timestamp("created_at").defaultNow().notNull()
 }, (table) => {
     return {
-        // --- ADICIONADO ---
-        // Garante que um usuário só pode repostar um tweet uma única vez.
+        // --- MUDANÇA 2 de 3: Adicionar restrição para evitar reposts duplicados ---
         uniqueRepost: unique('unique_repost').on(table.userId, table.tweetId),
     };
 });
 
-// Relations
+// Relations (Nenhuma alteração aqui, sua lógica original foi mantida)
 export const usersRelations = relations(users, ({ many }) => ({
   tweets: many(tweets),
   likes: many(likes),
@@ -95,7 +93,7 @@ export const repostsRelations = relations(reposts, ({ one }) => ({
   tweet: one(tweets, { fields: [reposts.tweetId], references: [tweets.id] })
 }));
 
-// Schemas
+// Schemas (Nenhuma alteração aqui)
 export const insertUserSchema = createInsertSchema(users, {
   username: (schema) => schema.min(3, "Nome de Delegação deve ter pelo menos 3 caracteres"),
   password: (schema) => schema.min(6, "Senha deve ter pelo menos 6 caracteres"),
@@ -146,7 +144,7 @@ export type TweetWithUser = {
   };
   likeCount?: number;
   isLiked?: boolean;
-  // --- ADICIONADO ---
+  // --- MUDANÇA 3 de 3: Adicionar campos para o frontend ---
   repostCount?: number;
   isReposted?: boolean;
 };
