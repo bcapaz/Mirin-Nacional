@@ -10,6 +10,7 @@ import { z } from "zod";
 import { insertTweetSchema } from "@shared/schema";
 import { processFileUpload, getPublicFilePath } from "./uploads";
 import { comments, reposts } from "@shared/schema"; 
+import { hashPassword } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configuração para servir arquivos estáticos
