@@ -1,6 +1,6 @@
 import { db } from "@db";
 import { users, tweets, likes, reposts, type Comment, type Repost } from "@shared/schema";
-import { eq, and, desc, sql, ne } from "drizzle-orm";
+import { eq, and, desc, sql, ne, unionAll } from "drizzle-orm";
 import { insertUserSchema } from "@shared/schema";
 import { type InsertUser, type User, type Tweet, type Like, type TweetWithUser } from "@shared/schema";
 import connectPg from "connect-pg-simple";
@@ -89,57 +89,43 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserTweets(userId: number, currentUserId: number): Promise<TweetWithUser[]> {
-    // Query 1: Busca os tweets ORIGINAIS do usuário
+    const profileUser = await this.getUser(userId);
+    const profileUsername = profileUser?.username ?? '';
+
     const originalTweetsQuery = db.select({
-      // Selecionamos todos os campos necessários para o TweetCard
-      id: tweets.id,
-      content: tweets.content,
-      userId: tweets.userId,
-      mediaUrl: tweets.mediaUrl,
-      createdAt: tweets.createdAt,
-      user: users,
-      repostCount: tweets.repostCount,
+      id: tweets.id, content: tweets.content, userId: tweets.userId, mediaUrl: tweets.mediaUrl,
+      createdAt: tweets.createdAt, user: users, repostCount: tweets.repostCount,
       likeCount: sql<number>`(SELECT COUNT(*) FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id})`.mapWith(Number),
       commentCount: sql<number>`(SELECT COUNT(*) FROM ${tweets} AS comments WHERE comments.parent_id = ${tweets.id})`.mapWith(Number),
       isLiked: sql<boolean>`EXISTS(SELECT 1 FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id} AND ${likes.userId} = ${currentUserId})`.mapWith(Boolean),
       isReposted: sql<boolean>`EXISTS(SELECT 1 FROM ${reposts} WHERE ${reposts.tweetId} = ${tweets.id} AND ${reposts.userId} = ${currentUserId})`.mapWith(Boolean),
-      // Campos extras para unificação e ordenação
-      activityTimestamp: tweets.createdAt, // Para ordenação, usamos a data de criação do tweet
-      type: sql<string>`'original'`.as('type'), // Identifica este item como um tweet original
-      repostedBy: sql<string>`NULL`.as('reposted_by') // Não foi repostado (placeholder)
-     })
+      activityTimestamp: tweets.createdAt,
+      type: sql<string>`'original'`.as('type'),
+      repostedBy: sql<string>`NULL`.as('reposted_by')
+    })
     .from(tweets)
     .innerJoin(users, eq(tweets.userId, users.id))
     .where(and(eq(tweets.userId, userId), sql`${tweets.isComment} IS NOT TRUE`));
 
-    // Query 2: Busca os tweets que o usuário REPOSTOU
     const repostedTweetsQuery = db.select({
-      // Selecionamos os mesmos campos, mas os dados vêm do tweet original
-      id: tweets.id,
-      content: tweets.content,
-      userId: tweets.userId,
-      mediaUrl: tweets.mediaUrl,
-      createdAt: tweets.createdAt, // Data de criação do TWEET ORIGINAL
-      user: users, // O AUTOR ORIGINAL do tweet
-      repostCount: tweets.repostCount,
+      id: tweets.id, content: tweets.content, userId: tweets.userId, mediaUrl: tweets.mediaUrl,
+      createdAt: tweets.createdAt, user: users, repostCount: tweets.repostCount,
       likeCount: sql<number>`(SELECT COUNT(*) FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id})`.mapWith(Number),
       commentCount: sql<number>`(SELECT COUNT(*) FROM ${tweets} AS comments WHERE comments.parent_id = ${tweets.id})`.mapWith(Number),
       isLiked: sql<boolean>`EXISTS(SELECT 1 FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id} AND ${likes.userId} = ${currentUserId})`.mapWith(Boolean),
       isReposted: sql<boolean>`EXISTS(SELECT 1 FROM ${reposts} WHERE ${reposts.tweetId} = ${tweets.id} AND ${reposts.userId} = ${currentUserId})`.mapWith(Boolean),
-      // Campos extras para unificação e ordenação
-      activityTimestamp: reposts.createdAt, // Para ordenação, usamos a data do REPOST
-      type: sql<string>`'repost'`.as('type'), // Identifica este item como um repost
-      repostedBy: sql<string>`${(await this.getUser(userId))?.username}`.as('reposted_by') // Nome de quem repostou
-     })
+      activityTimestamp: reposts.createdAt,
+      type: sql<string>`'repost'`.as('type'),
+      repostedBy: sql<string>`${profileUsername}`.as('reposted_by')
+    })
     .from(reposts)
     .innerJoin(tweets, eq(reposts.tweetId, tweets.id))
-    .innerJoin(users, eq(tweets.userId, users.id)) // Join com o autor original do tweet
+    .innerJoin(users, eq(tweets.userId, users.id))
     .where(eq(reposts.userId, userId));
 
-    // Une as duas queries em uma só e ordena pela data da atividade (seja criação ou repost)
-    const feed = await db.unionAll(originalTweetsQuery, repostedTweetsQuery)
-      .orderBy(desc(sql`activityTimestamp`));
-    
+    const combinedQuery = unionAll(originalTweetsQuery, repostedTweetsQuery).as('feed');
+    const feed = await db.select().from(combinedQuery).orderBy(desc(combinedQuery.activityTimestamp));
+      
     return feed as unknown as TweetWithUser[];
   }
 
