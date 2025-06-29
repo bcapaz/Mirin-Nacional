@@ -1,12 +1,3 @@
-Com certeza. É uma ótima forma de testar e isolar o problema. Se o erro acontece com o seu código original, saberemos que o problema não está nas alterações que sugeri, mas em outro lugar.
-
-Aqui está o seu arquivo server/auth.ts exatamente como você me enviou da primeira vez, sem nenhuma das minhas alterações para corrigir os erros de serialização.
-
-Seu Arquivo auth.ts Original
-Ação: Substitua o conteúdo do seu arquivo server/auth.ts por este código abaixo.
-
-TypeScript
-
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
