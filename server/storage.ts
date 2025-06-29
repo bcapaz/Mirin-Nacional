@@ -68,23 +68,35 @@ export class DatabaseStorage implements IStorage {
 
   async getAllTweets(currentUserId: number): Promise<TweetWithUser[]> {
     const result = await db.select({
+      // Campos do tweet
       id: tweets.id,
       content: tweets.content,
+      mediaData: tweets.mediaData,
       userId: tweets.userId,
-      mediaUrl: tweets.mediaUrl,
       createdAt: tweets.createdAt,
-      user: users,
-      likeCount: sql<number>`(SELECT COUNT(*) FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id})`.mapWith(Number),
-      commentCount: sql<number>`(SELECT COUNT(*) FROM ${tweets} AS comments WHERE comments.parent_id = ${tweets.id})`.mapWith(Number),
+      likeCount: tweets.likeCount,
       repostCount: tweets.repostCount,
+      commentCount: sql<number>`(SELECT count(*) FROM ${tweets} AS comments WHERE comments.parent_id = ${tweets.id})`.mapWith(Number),
+
+      // [CORRIGIDO] Selecionamos cada campo do usuário individualmente
+      user: {
+        id: users.id,
+        username: users.username,
+        name: users.name,
+        profileImage: users.profileImage,
+        avatarColor: users.avatarColor,
+      },
+
+      // Campos calculados
       isLiked: sql<boolean>`EXISTS(SELECT 1 FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id} AND ${likes.userId} = ${currentUserId})`.mapWith(Boolean),
       isReposted: sql<boolean>`EXISTS(SELECT 1 FROM ${reposts} WHERE ${reposts.tweetId} = ${tweets.id} AND ${reposts.userId} = ${currentUserId})`.mapWith(Boolean),
     })
     .from(tweets)
-    .where(sql`${tweets.isComment} IS NOT TRUE`)
     .innerJoin(users, eq(tweets.userId, users.id))
-    .groupBy(tweets.id, users.id)
+    .where(eq(tweets.isComment, false))
     .orderBy(desc(tweets.createdAt));
+    
+    // O groupBy não é mais necessário aqui pois não estamos usando agregação de count diretamente no select principal
     return result as unknown as TweetWithUser[];
   }
 
