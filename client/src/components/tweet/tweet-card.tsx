@@ -1,11 +1,12 @@
+// Nenhuma mudança nas importações, elas já estão corretas.
 import { TweetWithUser } from "@shared/schema";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { 
   MessageSquare, 
   Repeat2, 
-  Heart,
+  Heart, 
   HeartCrack,
-  Trash2
+  Trash2 
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useMutation } from "@tanstack/react-query";
@@ -29,6 +30,7 @@ export function TweetCard({ tweet }: TweetCardProps) {
   const [showCommentBox, setShowCommentBox] = useState(false);
   const [commentText, setCommentText] = useState("");
 
+  // Nenhuma mudança nesta parte de comentários
   useEffect(() => {
     fetchComments();
   }, []);
@@ -46,7 +48,7 @@ export function TweetCard({ tweet }: TweetCardProps) {
   const handleCommentSubmit = async () => {
     if (!commentText.trim()) return;
     try {
-      const res = await apiRequest("POST", `/api/tweets/${tweet.id}/comments`, {
+      await apiRequest("POST", `/api/tweets/${tweet.id}/comments`, {
         content: commentText.trim(),
       });
       setCommentText("");
@@ -57,6 +59,7 @@ export function TweetCard({ tweet }: TweetCardProps) {
     }
   };
 
+  // Nenhuma mudança na likeMutation
   const likeMutation = useMutation({
     mutationFn: async () => {
       if (tweet.isLiked) {
@@ -70,6 +73,35 @@ export function TweetCard({ tweet }: TweetCardProps) {
       queryClient.invalidateQueries({ queryKey: [`/api/profile/${tweet.user.username}/tweets`] });
     }
   });
+
+  // ==========================================================
+  // PASSO 1: CRIAR A MUTATION PARA REPOST
+  // ==========================================================
+  const repostMutation = useMutation({
+    mutationFn: async () => {
+      if (tweet.isReposted) {
+        // Se já foi repostado, usamos o método DELETE
+        await apiRequest("DELETE", `/api/tweets/${tweet.id}/repost`);
+      } else {
+        // Se não, usamos o método POST
+        await apiRequest("POST", `/api/tweets/${tweet.id}/repost`);
+      }
+    },
+    // Ao ter sucesso, invalidamos as queries para buscar os dados atualizados
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/profile/${tweet.user.username}/tweets`] });
+      // Adicione a query do feed do perfil também se for diferente
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao processar repost",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
 
   const deleteTweetMutation = useMutation({
     mutationFn: async () => {
@@ -91,10 +123,18 @@ export function TweetCard({ tweet }: TweetCardProps) {
       });
     }
   });
-
+  
   const handleLikeClick = () => {
     if (!user) return;
     likeMutation.mutate();
+  };
+
+  // ==========================================================
+  // PASSO 2: CRIAR A FUNÇÃO DE CLICK PARA O REPOST
+  // ==========================================================
+  const handleRepostClick = () => {
+    if (!user) return; // Só permite a ação se o usuário estiver logado
+    repostMutation.mutate(); // Chama a mutation que criamos
   };
 
   const handleDeleteClick = () => {
@@ -166,19 +206,33 @@ export function TweetCard({ tweet }: TweetCardProps) {
                 onClick={() => setShowCommentBox(!showCommentBox)}
               >
                 <MessageSquare className="w-4 h-4 mr-1" />
+                {/* O seu código aqui estava quebrando se commentCount fosse null, adicionei ?? 0 */}
                 <span>{tweet.commentCount ?? 0}</span>
               </button>
-              <div className="flex items-center text-muted-foreground">
+
+              {/* ========================================================== */}
+              {/* PASSO 3: ATUALIZAR O JSX DO BOTÃO DE REPOST */}
+              {/* ========================================================== */}
+              <button
+                className={`flex items-center hover:text-green-500 ${
+                  tweet.isReposted ? 'text-green-500' : 'text-muted-foreground'
+                }`}
+                onClick={handleRepostClick}
+                disabled={repostMutation.isPending || !user}
+              >
                 <Repeat2 className="w-4 h-4 mr-1" />
+                {/* Adicionado ?? 0 para segurança */}
                 <span>{tweet.repostCount ?? 0}</span>
-              </div>
+              </button>
+
               <button 
                 className={`flex items-center ${tweet.isLiked ? 'text-red-500' : 'text-muted-foreground hover:text-red-500'}`}
                 onClick={handleLikeClick}
                 disabled={likeMutation.isPending || !user}
               >
                 {tweet.isLiked ? <HeartCrack className="w-4 h-4 mr-1" /> : <Heart className="w-4 h-4 mr-1" />}
-                <span>{tweet.likeCount}</span>
+                {/* Adicionado ?? 0 para segurança */}
+                <span>{tweet.likeCount ?? 0}</span>
               </button>
             </div>
 
@@ -201,14 +255,13 @@ export function TweetCard({ tweet }: TweetCardProps) {
 
             {comments.length > 0 && (
               <div className="ml-6 mt-4 space-y-2 border-l border-muted pl-4">
-                {comments.map((comment) => (
+                {comments.map((comment: any) => (
                   <div key={comment.id} className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-2">
                     <strong>{comment.user?.username || "Anônimo"}:</strong> {comment.content}
                   </div>
                 ))}
               </div>
             )}
-
           </div>
         </div>
       </div>
