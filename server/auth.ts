@@ -22,6 +22,10 @@ export async function hashPassword(password: string) {
 }
 
 async function comparePasswords(supplied: string, stored: string) {
+  // Adiciona uma verificação para evitar que o programa quebre se a senha no banco estiver malformada
+  if (!stored || !stored.includes('.')) {
+    return false;
+  }
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
@@ -50,21 +54,25 @@ export function setupAuth(app: Express) {
         const user = await storage.getUserByUsername(username);
         if (!user || !(await comparePasswords(password, user.password))) {
           return done(null, false);
-        } else {
-          return done(null, user);
         }
+        return done(null, user);
       } catch (error) {
         return done(error);
       }
     }),
   );
 
-  // [CORREÇÃO] Adicionamos o tipo explícito 'SelectUser' ao parâmetro 'user'.
-  // Isso garante que o TypeScript e o JavaScript não se confundam sobre o formato do objeto.
+  // [CORREÇÃO 1] Adicionamos uma verificação para garantir que o objeto 'user' existe
+  // antes de tentar acessar 'user.id'. Isso resolve o erro "Cannot read properties of undefined (reading 'id')".
   passport.serializeUser((user: SelectUser, done) => {
+    if (!user) {
+      return done(new Error("Objeto de usuário indefinido durante a serialização."));
+    }
     done(null, user.id);
   });
 
+  // [CORREÇÃO 2] Esta lógica está correta para lidar com sessões de usuários que foram deletados.
+  // Ela previne o erro "Failed to deserialize user".
   passport.deserializeUser(async (id: number, done) => {
     try {
       const user = await storage.getUser(id);
@@ -85,6 +93,12 @@ export function setupAuth(app: Express) {
         ...req.body,
         password: await hashPassword(req.body.password),
       });
+
+      // [CORREÇÃO 3] Adicionamos uma verificação para garantir que o usuário foi criado no banco
+      // antes de tentar fazer o login automático.
+      if (!user) {
+        return next(new Error("Falha ao criar o usuário no banco de dados."));
+      }
 
       req.login(user, (err) => {
         if (err) return next(err);
