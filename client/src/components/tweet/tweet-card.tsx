@@ -22,16 +22,16 @@ interface TweetCardProps {
 }
 
 export function TweetCard({ tweet }: TweetCardProps) {
-  const { user } = useAuth();
+  const { user, user: currentUser } = useAuth(); // Adicionado currentUser para clareza
   const { toast } = useToast();
   const [mediaOpen, setMediaOpen] = useState(false);
-  const [comments, setComments] = useState<any[]>([]); // Tipagem para segurança
+  const [comments, setComments] = useState<any[]>([]);
   const [showCommentBox, setShowCommentBox] = useState(false);
   const [commentText, setCommentText] = useState("");
 
   useEffect(() => {
     fetchComments();
-  }, [tweet.id]); // Adicionado tweet.id como dependência para recarregar comentários se o tweet mudar
+  }, [tweet.id]);
 
   const fetchComments = async () => {
     try {
@@ -81,7 +81,7 @@ export function TweetCard({ tweet }: TweetCardProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/profile/${currentUser?.username}/tweets`] }); // Invalida o feed do usuário logado
+      queryClient.invalidateQueries({ queryKey: [`/api/profile/${currentUser?.username}/tweets`] });
       queryClient.invalidateQueries({ queryKey: [`/api/profile/${tweet.user.username}/tweets`] });
     },
     onError: (error: Error) => {
@@ -101,8 +101,7 @@ export function TweetCard({ tweet }: TweetCardProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
       queryClient.invalidateQueries({ queryKey: [`/api/profile/${tweet.user.username}/tweets`] });
       toast({
-        title: "Tweet excluído com sucesso",
-        description: "O tweet foi removido da plataforma.",
+        title: "Tweet excluído com sucesso"
       });
     },
     onError: (error: Error) => {
@@ -136,7 +135,6 @@ export function TweetCard({ tweet }: TweetCardProps) {
     locale: ptBR
   });
 
-  // [CORRIGIDO] Funções para checar o tipo de mídia a partir do Data URL (Base64)
   const isImage = (dataUrl: string) => dataUrl?.startsWith("data:image/");
   const isVideo = (dataUrl: string) => dataUrl?.startsWith("data:video/");
 
@@ -169,7 +167,6 @@ export function TweetCard({ tweet }: TweetCardProps) {
 
             {tweet.content && <p className="mt-1 text-foreground break-words">{tweet.content}</p>}
 
-            {/* [CORRIGIDO] Bloco inteiro para usar mediaData e as novas funções isImage/isVideo */}
             {tweet.mediaData && (
               <div className="mt-2 rounded-lg overflow-hidden border border-border">
                 {isImage(tweet.mediaData) ? (
@@ -217,18 +214,38 @@ export function TweetCard({ tweet }: TweetCardProps) {
               </button>
             </div>
 
+            {/* [RESTAURADO] Bloco de código para a caixa de comentário */}
             {showCommentBox && user && (
-                //... seu código de comentário aqui, sem alterações ...
+              <div className="mt-4">
+                <textarea
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Escreva um comentário..."
+                  className="w-full p-2 border rounded-md bg-background text-foreground"
+                />
+                <button 
+                  onClick={handleCommentSubmit}
+                  className="mt-2 bg-primary text-white px-4 py-1 rounded-md hover:bg-primary/90"
+                >
+                  Comentar
+                </button>
+              </div>
             )}
 
+            {/* [RESTAURADO] Bloco de código para exibir os comentários */}
             {comments.length > 0 && (
-                //... seu código de exibição de comentários aqui, sem alterações ...
+              <div className="ml-6 mt-4 space-y-2 border-l border-muted pl-4">
+                {comments.map((comment: any) => (
+                  <div key={comment.id} className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-2">
+                    <strong>{comment.user?.username || "Anônimo"}:</strong> {comment.content}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* [CORRIGIDO] Condição do Dialog para usar mediaData e a nova função isImage */}
       {tweet.mediaData && isImage(tweet.mediaData) && (
         <Dialog open={mediaOpen} onOpenChange={setMediaOpen}>
           <DialogContent className="max-w-4xl bg-transparent border-none shadow-none">
