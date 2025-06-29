@@ -43,11 +43,11 @@ export const comments = pgTable("comments", {
 });
 
 export const reposts = pgTable("reposts", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  tweetId: integer("tweet_id").references(() => tweets.id).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull()
-  {(table) => { 
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  tweetId: integer("tweet_id").references(() => tweets.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+}, (table) => {
   return {
     uniqueRepost: unique('unique_repost').on(table.userId, table.tweetId),
   };
