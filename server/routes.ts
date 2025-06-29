@@ -40,36 +40,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Unauthorized" });
       }
+    
+      // Você já tem uma função para processar uploads, vamos continuar usando-a
+      const { fields, files } = await processFileUpload(req);
+      const content = fields.content || "";
+      let mediaData = null;
+
+      // Se um arquivo foi enviado, vamos processá-lo
+      if (files.media) {
+        const file = files.media;
+        // 'file.buffer' contém os dados brutos da imagem
+        // 'file.mimetype' contém o tipo (ex: 'image/png')
       
-      // Processar upload de arquivos
-      let content = "";
-      let mediaUrl = null;
-      
-      try {
-        const { fields, files } = await processFileUpload(req);
-        content = fields.content || "";
-        
-        if (files.media) {
-          mediaUrl = files.media.path;
-        }
-      } catch (error) {
-        console.error("Error processing file upload:", error);
-        return res.status(400).json({ message: error.message || "Erro ao processar upload" });
+        // Converte os dados da imagem para um Data URL (texto Base64)
+        const b64 = file.buffer.toString("base64");
+        mediaData = `data:${file.mimetype};base64,${b64}`;
       }
-      
-      if (!content && !mediaUrl) {
+
+      if (!content && !mediaData) {
         return res.status(400).json({ message: "Conteúdo ou mídia são obrigatórios" });
       }
-      
-      if (content && content.length > 280) {
-        return res.status(400).json({ message: "Tweet excede 280 caracteres" });
-      }
-      
+    
+      // Salva o tweet no banco com a string Base64 em mediaData
       const newTweet = await storage.createTweet({
         content,
         userId: req.user.id,
-        mediaUrl
-    });
+        mediaData // Passando os dados da imagem em formato de texto
+      });
+    
+      return res.status(201).json(newTweet);
+    } catch (error) {
+      console.error("Error creating tweet:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
       
       return res.status(201).json(newTweet);
     } catch (error) {
