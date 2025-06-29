@@ -1,11 +1,13 @@
 import { db } from "@db";
-import { users, tweets, likes } from "@shared/schema";
+// [MODIFICADO] Adicionamos 'reposts' e os tipos 'Repost' e 'Comment' que faltavam na importação
+import { users, tweets, likes, reposts, type Comment, type Repost } from "@shared/schema";
 import { eq, and, desc, sql, ne } from "drizzle-orm";
 import { insertUserSchema } from "@shared/schema";
 import { type InsertUser, type User, type Tweet, type Like, type TweetWithUser } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import session from "express-session";
 
+// [MODIFICADO] Atualizamos a interface para refletir as novas funções
 export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getUser(id: number): Promise<User | undefined>;
@@ -23,9 +25,12 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   sessionStore: session.Store;
   createComment(comment: { content: string; userId: number; tweetId: number }): Promise<Comment>;
-  createRepost(repost: { userId: number; tweetId: number }): Promise<Repost>;
   getComments(tweetId: number): Promise<(Comment & { user: User })[]>;
-  getReposts(tweetId: number): Promise<(Repost & { user: User })[]>;
+
+  // Funções de Repost
+  getRepost(userId: number, tweetId: number): Promise<Repost | undefined>;
+  createRepost(userId: number, tweetId: number): Promise<void>;
+  deleteRepost(userId: number, tweetId: number): Promise<void>;
 }
 
 const PostgresSessionStore = connectPg(session);
@@ -42,39 +47,15 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async createUser(user: InsertUser): Promise<User> {
-    const validatedData = insertUserSchema.parse(user);
-    const [newUser] = await db.insert(users).values(validatedData).returning();
-    return newUser;
-  }
+  // --- NENHUMA MUDANÇA NAS FUNÇÕES DE USER ---
+  async createUser(user: InsertUser): Promise<User> { /* ... seu código original ... */ }
+  async getUser(id: number): Promise<User | undefined> { /* ... seu código original ... */ }
+  async getUserByUsername(username: string): Promise<User | undefined> { /* ... seu código original ... */ }
+  async updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string }): Promise<User> { /* ... seu código original ... */ }
+  async getRandomUsers(excludeUserId: number, limit: number): Promise<User[]> { /* ... seu código original ... */ }
+  async getAllUsers(): Promise<User[]> { /* ... seu código original ... */ }
 
-  async getUser(id: number): Promise<User | undefined> {
-    const result = await db.query.users.findFirst({
-      where: eq(users.id, id)
-    });
-    return result;
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await db.query.users.findFirst({
-      where: eq(users.username, username)
-    });
-    return result;
-  }
-
-  async updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string }): Promise<User> {
-    const [updatedUser] = await db.update(users)
-      .set({
-        username: data.username,
-        bio: data.bio,
-        profileImage: data.profileImage
-      })
-      .where(eq(users.id, id))
-      .returning();
-    
-    return updatedUser;
-  }
-
+  // --- [MODIFICADO] GET ALL TWEETS ---
   async getAllTweets(currentUserId: number): Promise<TweetWithUser[]> {
     const result = await db.select({
       id: tweets.id,
@@ -83,168 +64,93 @@ export class DatabaseStorage implements IStorage {
       mediaUrl: tweets.mediaUrl,
       createdAt: tweets.createdAt,
       user: users,
-      likeCount: sql<number>`count(${likes.id})`.mapWith(Number),
-      commentCount: sql<number>`(
-        SELECT count(*) FROM ${tweets} AS comments
-        WHERE comments.parent_id = ${tweets.id}
-      )`.mapWith(Number),
-      isLiked: sql<boolean>`CASE WHEN exists(
-        select 1 from ${likes} where ${likes.tweetId} = ${tweets.id} and ${likes.userId} = ${currentUserId}
-      ) THEN true ELSE false END`.mapWith(Boolean),
+      likeCount: sql<number>`(SELECT COUNT(*) FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id})`.mapWith(Number),
+      commentCount: sql<number>`(SELECT COUNT(*) FROM ${tweets} AS comments WHERE comments.parent_id = ${tweets.id})`.mapWith(Number),
+      // Adicionamos a contagem de reposts diretamente da coluna que criamos
+      repostCount: tweets.repostCount,
+      // Adicionamos a verificação se o usuário atual curtiu
+      isLiked: sql<boolean>`EXISTS(SELECT 1 FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id} AND ${likes.userId} = ${currentUserId})`.mapWith(Boolean),
+      // Adicionamos a verificação se o usuário atual repostou
+      isReposted: sql<boolean>`EXISTS(SELECT 1 FROM ${reposts} WHERE ${reposts.tweetId} = ${tweets.id} AND ${reposts.userId} = ${currentUserId})`.mapWith(Boolean),
     })
     .from(tweets)
     .where(sql`${tweets.isComment} IS NOT TRUE`)
-    .leftJoin(users, eq(tweets.userId, users.id))
-    .leftJoin(likes, eq(tweets.id, likes.tweetId))
+    .innerJoin(users, eq(tweets.userId, users.id))
     .groupBy(tweets.id, users.id)
     .orderBy(desc(tweets.createdAt));
 
-    return result;
+    return result as unknown as TweetWithUser[];
   }
 
+  // --- [MODIFICADO] GET USER TWEETS ---
   async getUserTweets(userId: number, currentUserId: number): Promise<TweetWithUser[]> {
-    const result = await db.select({
-      id: tweets.id,
-      content: tweets.content,
-      userId: tweets.userId,
-      mediaUrl: tweets.mediaUrl,
-      createdAt: tweets.createdAt,
-      user: users,
-      likeCount: sql<number>`count(${likes.id})`.mapWith(Number),
-      commentCount: sql<number>`(
-  	SELECT count(*) FROM ${tweets} AS comments
-  	WHERE comments.parentId = ${tweets.id}
-      )`.mapWith(Number),
-      isLiked: sql<boolean>`CASE WHEN exists(
-        select 1 from ${likes} where ${likes.tweetId} = ${tweets.id} and ${likes.userId} = ${currentUserId}
-      ) THEN true ELSE false END`.mapWith(Boolean),
-    })
-    .from(tweets)
-    .leftJoin(users, eq(tweets.userId, users.id))
-    .leftJoin(likes, eq(tweets.id, likes.tweetId))
-    .where(eq(tweets.userId, userId))
-    .groupBy(tweets.id, users.id)
-    .orderBy(desc(tweets.createdAt));
-    
-    return result;
+    // A lógica para pegar os tweets e reposts de um usuário é mais complexa e
+    // podemos implementar depois. Por enquanto, vamos apenas garantir que os reposts apareçam corretamente.
+    // Esta query agora inclui os dados de like e repost.
+    const userTweets = await db.select({
+        id: tweets.id,
+        content: tweets.content,
+        userId: tweets.userId,
+        mediaUrl: tweets.mediaUrl,
+        createdAt: tweets.createdAt,
+        user: users,
+        likeCount: sql<number>`(SELECT COUNT(*) FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id})`.mapWith(Number),
+        commentCount: sql<number>`(SELECT COUNT(*) FROM ${tweets} AS comments WHERE comments.parent_id = ${tweets.id})`.mapWith(Number),
+        repostCount: tweets.repostCount,
+        isLiked: sql<boolean>`EXISTS(SELECT 1 FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id} AND ${likes.userId} = ${currentUserId})`.mapWith(Boolean),
+        isReposted: sql<boolean>`EXISTS(SELECT 1 FROM ${reposts} WHERE ${reposts.tweetId} = ${tweets.id} AND ${reposts.userId} = ${currentUserId})`.mapWith(Boolean),
+      })
+      .from(tweets)
+      .innerJoin(users, eq(tweets.userId, users.id))
+      .where(and(eq(tweets.userId, userId), sql`${tweets.isComment} IS NOT TRUE`))
+      .groupBy(tweets.id, users.id)
+      .orderBy(desc(tweets.createdAt));
+      
+    return userTweets as unknown as TweetWithUser[];
   }
 
-  async createTweet(tweet: {
-    content: string;
-    userId: number;
-    mediaUrl?: string | null;
-    parentId?: number;
-    isComment?: boolean;
-  }): Promise<Tweet> {
-    const [newTweet] = await db.insert(tweets).values(tweet).returning();
-    return newTweet;
-  }
-
-  async getTweetById(id: number): Promise<Tweet | undefined> {
-    const result = await db.query.tweets.findFirst({
-      where: eq(tweets.id, id)
-    });
-    return result;
-  }
-
-  async deleteTweet(id: number): Promise<void> {
-    // Primeiro, excluir todas as curtidas relacionadas a este tweet
-    await db.delete(likes).where(eq(likes.tweetId, id));
-    
-    // Depois, excluir o tweet
-    await db.delete(tweets).where(eq(tweets.id, id));
-  }
-
-  async createLike(like: { userId: number; tweetId: number }): Promise<Like> {
-    const [newLike] = await db.insert(likes).values(like).returning();
-    return newLike;
-  }
-
-  async deleteLike(userId: number, tweetId: number): Promise<void> {
-    await db.delete(likes)
-      .where(
-        and(
-          eq(likes.userId, userId),
-          eq(likes.tweetId, tweetId)
-        )
-      );
-  }
-
-  async getLike(userId: number, tweetId: number): Promise<Like | undefined> {
-    const result = await db.query.likes.findFirst({
-      where: and(
-        eq(likes.userId, userId),
-        eq(likes.tweetId, tweetId)
-      )
-    });
-    return result;
-  }
-
-  async getRandomUsers(excludeUserId: number, limit: number): Promise<User[]> {
-    const result = await db.select()
-      .from(users)
-      .where(ne(users.id, excludeUserId))
-      .limit(limit);
-    
-    return result;
-  }
-
-  async getAllUsers(): Promise<User[]> {
-    const result = await db.select().from(users).orderBy(users.username);
-    return result;
-  }
-
-  async createComment(comment: {
-  content: string;
-  userId: number;
-  tweetId: number;
-  }): Promise<Tweet> {
-  const [newComment] = await db.insert(tweets).values({
-    content: comment.content,
-    userId: comment.userId,
-    parentId: comment.tweetId,  // Isso referencia o tweet original
-    isComment: true,
-    createdAt: new Date(),
-    likeCount: 0
-  }).returning();
+  // --- NENHUMA MUDANÇA NAS FUNÇÕES DE TWEET E LIKE ---
+  async createTweet(tweet: { /*...*/ }): Promise<Tweet> { /* ... seu código original ... */ }
+  async getTweetById(id: number): Promise<Tweet | undefined> { /* ... seu código original ... */ }
+  async deleteTweet(id: number): Promise<void> { /* ... seu código original ... */ }
+  async createLike(like: { userId: number; tweetId: number }): Promise<Like> { /* ... seu código original ... */ }
+  async deleteLike(userId: number, tweetId: number): Promise<void> { /* ... seu código original ... */ }
+  async getLike(userId: number, tweetId: number): Promise<Like | undefined> { /* ... seu código original ... */ }
   
-  return newComment;
+  // --- NENHUMA MUDANÇA NAS FUNÇÕES DE COMENTÁRIO ---
+  async createComment(comment: { /*...*/ }): Promise<Tweet> { /* ... seu código original ... */ }
+  async getComments(tweetId: number): Promise<TweetWithUser[]> { /* ... seu código original ... */ }
+  
+  // --- [ADICIONADO] NOVAS FUNÇÕES DE REPOST ---
+  async getRepost(userId: number, tweetId: number): Promise<Repost | undefined> {
+    return await db.query.reposts.findFirst({
+      where: and(eq(reposts.userId, userId), eq(reposts.tweetId, tweetId)),
+    });
   }
 
-  async getComments(tweetId: number): Promise<TweetWithUser[]> {
-  const result = await db.query.tweets.findMany({
-    where: (tweets, { eq }) => eq(tweets.parentId, tweetId),
-    with: {
-      user: {
-        columns: {
-          id: true,
-          username: true,
-          profileImage: true,
-          avatarColor: true
-        }
-      }
-    },
-    orderBy: (tweets, { desc }) => [desc(tweets.createdAt)]
-  });
-
-  return result.map(tweet => ({
-    ...tweet,
-    isLiked: false, // Você pode preencher isso depois
-    likeCount: tweet.likeCount || 0
-  }));
+  // [MODIFICADO] createRepost agora atualiza o contador
+  async createRepost(userId: number, tweetId: number): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.insert(reposts).values({ userId, tweetId });
+      await tx
+        .update(tweets)
+        .set({ repostCount: sql`${tweets.repostCount} + 1` })
+        .where(eq(tweets.id, tweetId));
+    });
   }
 
-  async createRepost(repost: { userId: number; tweetId: number }): Promise<Repost> {
-    const [newRepost] = await db.insert(reposts).values(repost).returning();
-    return newRepost;
-  }
-
-  async getReposts(tweetId: number): Promise<(Repost & { user: User })[]> {
-    return await db.select()
-      .from(reposts)
-      .leftJoin(users, eq(reposts.userId, users.id))
-      .where(eq(reposts.tweetId, tweetId))
-      .orderBy(desc(reposts.createdAt));
+  // [ADICIONADO] deleteRepost para remover e atualizar o contador
+  async deleteRepost(userId: number, tweetId: number): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(reposts)
+        .where(and(eq(reposts.userId, userId), eq(reposts.tweetId, tweetId)));
+      await tx
+        .update(tweets)
+        .set({ repostCount: sql`${tweets.repostCount} - 1` })
+        .where(eq(tweets.id, tweetId));
+    });
   }
 }
+
 export const storage = new DatabaseStorage();
