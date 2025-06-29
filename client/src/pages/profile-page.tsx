@@ -102,7 +102,7 @@ export default function ProfilePage() {
                   <Loader2 className="h-8 w-8 animate-spin text-accent" />
                 </div>
               ) : userTweets && userTweets.length > 0 ? (
-                userTweets.map(tweet => (
+                {userTweets.map(tweet => (
                   <div key={`${item.type}-${item.id}`}>
 		      {item.type === 'repost' && (
      			 <div className="flex items-center text-sm text-muted-foreground pl-12 pt-2 -mb-2">
