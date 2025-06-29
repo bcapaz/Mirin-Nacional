@@ -9,6 +9,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { ProfileEditForm } from "@/components/profile/profile-edit-form";
+import { Repeat2 } from "lucide-react";
 
 export default function ProfilePage() {
   const { username } = useParams<{ username: string }>();
@@ -102,7 +103,16 @@ export default function ProfilePage() {
                 </div>
               ) : userTweets && userTweets.length > 0 ? (
                 userTweets.map(tweet => (
-                  <TweetCard key={tweet.id} tweet={tweet} />
+                  <div key={`${item.type}-${item.id}`}>
+		      {item.type === 'repost' && (
+     			 <div className="flex items-center text-sm text-muted-foreground pl-12 pt-2 -mb-2">
+     			   <Repeat2 className="w-4 h-4 mr-2" />
+    			   {item.repostedBy || 'Você'} repostou
+      			 </div>
+   		      )}
+		      <TweetCard tweet={item} />
+  		  </div>
+		))}
                 ))
               ) : (
                 <div className="p-8 text-center text-muted-foreground">
