@@ -74,13 +74,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Internal server error" });
     }
   });
-      
-      return res.status(201).json(newTweet);
-    } catch (error) {
-      console.error("Error creating tweet:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
   
   // Like a tweet
   app.post("/api/tweets/:id/like", async (req, res) => {
