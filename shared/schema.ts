@@ -47,7 +47,7 @@ export const reposts = pgTable("reposts", {
   userId: integer("user_id").references(() => users.id).notNull(),
   tweetId: integer("tweet_id").references(() => tweets.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull()
-  }, (table) => { 
+  (table) => { 
   return {
     uniqueRepost: unique('unique_repost').on(table.userId, table.tweetId),
   };
