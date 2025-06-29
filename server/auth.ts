@@ -1,3 +1,12 @@
+Com certeza. É uma ótima forma de testar e isolar o problema. Se o erro acontece com o seu código original, saberemos que o problema não está nas alterações que sugeri, mas em outro lugar.
+
+Aqui está o seu arquivo server/auth.ts exatamente como você me enviou da primeira vez, sem nenhuma das minhas alterações para corrigir os erros de serialização.
+
+Seu Arquivo auth.ts Original
+Ação: Substitua o conteúdo do seu arquivo server/auth.ts por este código abaixo.
+
+TypeScript
+
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
@@ -15,17 +24,13 @@ declare global {
 
 const scryptAsync = promisify(scrypt);
 
-export async function hashPassword(password: string) {
+async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
 }
 
 async function comparePasswords(supplied: string, stored: string) {
-  // Adiciona uma verificação para evitar que o programa quebre se a senha no banco estiver malformada
-  if (!stored || !stored.includes('.')) {
-    return false;
-  }
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
@@ -54,29 +59,20 @@ export function setupAuth(app: Express) {
         const user = await storage.getUserByUsername(username);
         if (!user || !(await comparePasswords(password, user.password))) {
           return done(null, false);
+        } else {
+          return done(null, user);
         }
-        return done(null, user);
       } catch (error) {
         return done(error);
       }
     }),
   );
 
-  // [CORREÇÃO 1] Adicionamos uma verificação para garantir que o objeto 'user' existe
-  // antes de tentar acessar 'user.id'. Isso resolve o erro "Cannot read properties of undefined (reading 'id')".
-  passport.serializeUser((user: SelectUser, done) => {
-    if (!user) {
-      return done(new Error("Objeto de usuário indefinido durante a serialização."));
-    }
-    done(null, user.id);
-  });
-
-  // [CORREÇÃO 2] Esta lógica está correta para lidar com sessões de usuários que foram deletados.
-  // Ela previne o erro "Failed to deserialize user".
+  passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {
     try {
       const user = await storage.getUser(id);
-      done(null, user || false);
+      done(null, user);
     } catch (error) {
       done(error);
     }
@@ -94,16 +90,9 @@ export function setupAuth(app: Express) {
         password: await hashPassword(req.body.password),
       });
 
-      // [CORREÇÃO 3] Adicionamos uma verificação para garantir que o usuário foi criado no banco
-      // antes de tentar fazer o login automático.
-      if (!user) {
-        return next(new Error("Falha ao criar o usuário no banco de dados."));
-      }
-
       req.login(user, (err) => {
         if (err) return next(err);
-        const { password, ...userWithoutPassword } = user;
-        res.status(201).json(userWithoutPassword);
+        res.status(201).json(user);
       });
     } catch (error) {
       console.error("Registration error:", error);
@@ -112,7 +101,7 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err: Error | null, user: SelectUser | false) => {
+    passport.authenticate("local", (err: Error, user: SelectUser) => {
       if (err) return next(err);
       if (!user) {
         return res.status(401).json({ message: "Nome de usuário ou senha inválidos" });
@@ -120,8 +109,7 @@ export function setupAuth(app: Express) {
       
       req.login(user, (loginErr) => {
         if (loginErr) return next(loginErr);
-        const { password, ...userWithoutPassword } = user;
-        return res.status(200).json(userWithoutPassword);
+        return res.status(200).json(user);
       });
     })(req, res, next);
   });
@@ -135,8 +123,6 @@ export function setupAuth(app: Express) {
 
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    // @ts-ignore
-    const { password, ...userWithoutPassword } = req.user;
-    res.json(userWithoutPassword);
+    res.json(req.user);
   });
 }
