@@ -1,12 +1,3 @@
-Você está absolutamente certo, peço mil desculpas. O erro foi meu. Para tentar ser mais claro e focar nas funções que estávamos alterando, eu substituí o corpo das suas funções originais por /* ...código original... */. Isso foi uma péssima ideia, pois deixou seu arquivo storage.ts incompleto e causou os erros. Foi um erro da minha parte.
-
-Vou te fornecer agora o arquivo storage.ts 100% completo, combinando o seu código original que já funcionava com todas as nossas correções e as novas funcionalidades que adicionamos.
-
-O Arquivo storage.ts Final e Completo
-Ação: Por favor, substitua o conteúdo inteiro do seu arquivo server/storage.ts por este código.
-
-TypeScript
-
 import { db } from "@db";
 import { users, tweets, likes, reposts, type Comment, type Repost } from "@shared/schema";
 import { eq, and, desc, sql, ne } from "drizzle-orm";
