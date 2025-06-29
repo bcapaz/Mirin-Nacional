@@ -18,7 +18,7 @@ export const users = pgTable("users", {
 export const tweets = pgTable("tweets", {
   id: serial("id").primaryKey(),
   content: text("content").notNull(),
-  mediaUrl: text("media_url"),
+  mediaData: text("media_data")
   userId: integer("user_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   parentId: integer("parent_id").references(() => tweets.id),
