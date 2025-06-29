@@ -59,15 +59,20 @@ export function setupAuth(app: Express) {
     }),
   );
 
-  passport.serializeUser((user, done) => done(null, user.id));
-    passport.deserializeUser(async (id: number, done) => {
-    try {
-      const user = await storage.getUser(id);
-      done(null, user || false);
-    } catch (error) {
-      done(error);
-    }
-  });
+  // [CORREÇÃO] Adicionamos o tipo explícito 'SelectUser' ao parâmetro 'user'.
+  // Isso garante que o TypeScript e o JavaScript não se confundam sobre o formato do objeto.
+  passport.serializeUser((user: SelectUser, done) => {
+    done(null, user.id);
+  });
+
+  passport.deserializeUser(async (id: number, done) => {
+    try {
+      const user = await storage.getUser(id);
+      done(null, user || false);
+    } catch (error) {
+      done(error);
+    }
+  });
 
   app.post("/api/register", async (req, res, next) => {
     try {
@@ -83,7 +88,8 @@ export function setupAuth(app: Express) {
 
       req.login(user, (err) => {
         if (err) return next(err);
-        res.status(201).json(user);
+        const { password, ...userWithoutPassword } = user;
+        res.status(201).json(userWithoutPassword);
       });
     } catch (error) {
       console.error("Registration error:", error);
@@ -92,7 +98,7 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err: Error, user: SelectUser) => {
+    passport.authenticate("local", (err: Error | null, user: SelectUser | false) => {
       if (err) return next(err);
       if (!user) {
         return res.status(401).json({ message: "Nome de usuário ou senha inválidos" });
@@ -100,7 +106,8 @@ export function setupAuth(app: Express) {
       
       req.login(user, (loginErr) => {
         if (loginErr) return next(loginErr);
-        return res.status(200).json(user);
+        const { password, ...userWithoutPassword } = user;
+        return res.status(200).json(userWithoutPassword);
       });
     })(req, res, next);
   });
@@ -114,6 +121,8 @@ export function setupAuth(app: Express) {
 
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    res.json(req.user);
+    // @ts-ignore
+    const { password, ...userWithoutPassword } = req.user;
+    res.json(userWithoutPassword);
   });
 }
