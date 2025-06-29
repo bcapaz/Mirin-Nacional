@@ -42,7 +42,7 @@ export default function ProfilePage() {
             {/* Profile Info */}
             {isLoadingProfile ? (
               // ... Nenhuma mudança aqui ...
-            ) : profileUser ? (
+            ) => profileUser ? (
               <div className="p-6 bg-card border-b border-border">
                   {/* ... Nenhuma mudança nas informações de perfil ... */}
               </div>
@@ -57,11 +57,11 @@ export default function ProfilePage() {
                   <Loader2 className="h-8 w-8 animate-spin text-accent" />
                 </div>
               // [CORREÇÃO 1 de 2]: Adicionamos este bloco para mostrar o erro em vez de quebrar a página.
-              ) : isError ? (
+              ) => isError ? (
                 <div className="p-8 text-center text-destructive">
                   Ocorreu um erro ao carregar o feed: {error instanceof Error ? error.message : 'Erro desconhecido'}
                 </div>
-              ) : userTweets && userTweets.length > 0 ? (
+              ) => userTweets && userTweets.length > 0 ? (
                 // [CORREÇÃO 2 de 2]: A variável do map foi renomeada de 'tweet' para 'item'.
                 userTweets.map(item => (
                   <div key={`${item.type}-${item.id}`}>
