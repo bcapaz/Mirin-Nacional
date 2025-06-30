@@ -31,7 +31,7 @@ export interface IStorage {
   deleteRepost(userId: number, tweetId: number): Promise<void>;
   getReposts(tweetId: number): Promise<(Repost & { user: User | null })[]>;
   getNonAdminUsers(): Promise<User[]>;
-  resetUserPassword(userId: number): Promise<string>; // [ADICIONADO] Nova função na interface
+  resetUserPassword(userId: number): Promise<string>; // [ADICIONADO]
 }
 
 const PostgresSessionStore = connectPg(session);
@@ -103,7 +103,6 @@ export class DatabaseStorage implements IStorage {
   async getUserTweets(userId: number, currentUserId: number): Promise<TweetWithUser[]> {
     const profileUser = await this.getUser(userId);
     const profileUsername = profileUser?.username ?? '';
-
     const originalTweets = await db.select({
       id: tweets.id, content: tweets.content, mediaData: tweets.mediaData, userId: tweets.userId,
       createdAt: tweets.createdAt, repostCount: tweets.repostCount,
@@ -116,11 +115,7 @@ export class DatabaseStorage implements IStorage {
     .from(tweets)
     .innerJoin(users, eq(tweets.userId, users.id))
     .where(and(eq(tweets.userId, userId), eq(tweets.isComment, false)));
-
-    const formattedOriginals = originalTweets.map(t => ({
-      ...t, type: 'original' as const, activityTimestamp: t.createdAt, repostedBy: null,
-    }));
-
+    const formattedOriginals = originalTweets.map(t => ({ ...t, type: 'original' as const, activityTimestamp: t.createdAt, repostedBy: null, }));
     const userReposts = await db.select({
       repostTimestamp: reposts.createdAt,
       originalTweet: {
@@ -137,14 +132,9 @@ export class DatabaseStorage implements IStorage {
     .innerJoin(tweets, eq(reposts.tweetId, tweets.id))
     .innerJoin(users, eq(tweets.userId, users.id))
     .where(eq(reposts.userId, userId));
-    
-    const formattedReposts = userReposts.map(r => ({
-      ...r.originalTweet, type: 'repost' as const, activityTimestamp: r.repostTimestamp, repostedBy: profileUsername
-    }));
-
+    const formattedReposts = userReposts.map(r => ({ ...r.originalTweet, type: 'repost' as const, activityTimestamp: r.repostTimestamp, repostedBy: profileUsername }));
     const feed = [...formattedOriginals, ...formattedReposts];
     feed.sort((a, b) => new Date(b.activityTimestamp).getTime() - new Date(a.activityTimestamp).getTime());
-    
     return feed as unknown as TweetWithUser[];
   }
 
@@ -167,29 +157,19 @@ export class DatabaseStorage implements IStorage {
   async createLike(like: { userId: number; tweetId: number }): Promise<void> {
     await db.transaction(async (tx) => {
       await tx.insert(likes).values(like);
-      await tx
-        .update(tweets)
-        .set({ likeCount: sql`${tweets.likeCount} + 1` })
-        .where(eq(tweets.id, like.tweetId));
+      await tx.update(tweets).set({ likeCount: sql`${tweets.likeCount} + 1` }).where(eq(tweets.id, like.tweetId));
     });
   }
 
   async deleteLike(userId: number, tweetId: number): Promise<void> {
     await db.transaction(async (tx) => {
-      await tx
-        .delete(likes)
-        .where(and(eq(likes.userId, userId), eq(likes.tweetId, tweetId)));
-      await tx
-        .update(tweets)
-        .set({ likeCount: sql`${tweets.likeCount} - 1` })
-        .where(eq(tweets.id, tweetId));
+      await tx.delete(likes).where(and(eq(likes.userId, userId), eq(likes.tweetId, tweetId)));
+      await tx.update(tweets).set({ likeCount: sql`${tweets.likeCount} - 1` }).where(eq(tweets.id, tweetId));
     });
   }
 
   async getLike(userId: number, tweetId: number): Promise<Like | undefined> {
-    return await db.query.likes.findFirst({
-      where: and(eq(likes.userId, userId), eq(likes.tweetId, tweetId))
-    });
+    return await db.query.likes.findFirst({ where: and(eq(likes.userId, userId), eq(likes.tweetId, tweetId)) });
   }
 
   async getRandomUsers(excludeUserId: number, limit: number): Promise<User[]> {
@@ -216,42 +196,28 @@ export class DatabaseStorage implements IStorage {
     const result = await db.query.tweets.findMany({
       where: (tweets, { eq }) => eq(tweets.parentId, tweetId),
       with: {
-        user: {
-          columns: { id: true, username: true, profileImage: true, avatarColor: true }
-        }
+        user: { columns: { id: true, username: true, profileImage: true, avatarColor: true } }
       },
       orderBy: (tweets, { desc }) => [desc(tweets.createdAt)]
     });
-    return result.map(tweet => ({
-      ...tweet, isLiked: false, likeCount: tweet.likeCount || 0
-    }));
+    return result.map(tweet => ({ ...tweet, isLiked: false, likeCount: tweet.likeCount || 0 }));
   }
 
   async getRepost(userId: number, tweetId: number): Promise<Repost | undefined> {
-    return await db.query.reposts.findFirst({
-      where: and(eq(reposts.userId, userId), eq(reposts.tweetId, tweetId)),
-    });
+    return await db.query.reposts.findFirst({ where: and(eq(reposts.userId, userId), eq(reposts.tweetId, tweetId)), });
   }
 
   async createRepost(userId: number, tweetId: number): Promise<void> {
     await db.transaction(async (tx) => {
       await tx.insert(reposts).values({ userId, tweetId });
-      await tx
-        .update(tweets)
-        .set({ repostCount: sql`${tweets.repostCount} + 1` })
-        .where(eq(tweets.id, tweetId));
+      await tx.update(tweets).set({ repostCount: sql`${tweets.repostCount} + 1` }).where(eq(tweets.id, tweetId));
     });
   }
 
   async deleteRepost(userId: number, tweetId: number): Promise<void> {
     await db.transaction(async (tx) => {
-      await tx
-        .delete(reposts)
-        .where(and(eq(reposts.userId, userId), eq(reposts.tweetId, tweetId)));
-      await tx
-        .update(tweets)
-        .set({ repostCount: sql`${tweets.repostCount} - 1` })
-        .where(eq(tweets.id, tweetId));
+      await tx.delete(reposts).where(and(eq(reposts.userId, userId), eq(reposts.tweetId, tweetId)));
+      await tx.update(tweets).set({ repostCount: sql`${tweets.repostCount} - 1` }).where(eq(tweets.id, tweetId));
     });
   }
 
@@ -263,20 +229,11 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  // [ADICIONADO] Nova função para redefinir a senha
+  // [ADICIONADO] Nova função para redefinir a senha pelo admin
   async resetUserPassword(userId: number): Promise<string> {
-    // Gera uma senha temporária simples e aleatória
     const newPassword = `mudar${randomBytes(3).toString('hex')}`;
-    
-    // Usa a sua função já existente para criptografar a nova senha
     const hashedPassword = await hashPassword(newPassword);
-
-    // Atualiza o utilizador no banco de dados com a nova senha
-    await db.update(users)
-      .set({ password: hashedPassword })
-      .where(eq(users.id, userId));
-    
-    // Retorna a senha em texto plano para ser exibida ao admin
+    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
     return newPassword;
   }
 }

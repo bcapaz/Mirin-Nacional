@@ -28,15 +28,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
       const identifier = req.params.identifier;
       let user;
-
       if (!isNaN(parseInt(identifier, 10))) {
         user = await storage.getUser(parseInt(identifier, 10));
       } else {
         user = await storage.getUserByUsername(identifier);
       }
-      
       if (!user) return res.status(404).json({ message: "User not found" });
-      
       const { password, ...userWithoutPassword } = user;
       return res.json(userWithoutPassword);
     } catch (error) {
@@ -50,15 +47,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
       const identifier = req.params.identifier;
       let user;
-
       if (!isNaN(parseInt(identifier, 10))) {
         user = await storage.getUser(parseInt(identifier, 10));
       } else {
         user = await storage.getUserByUsername(identifier);
       }
-
       if (!user) return res.status(404).json({ message: "User not found" });
-      
       // @ts-ignore
       const userTweets = await storage.getUserTweets(user.id, req.user.id);
       return res.json(userTweets);
