@@ -76,8 +76,8 @@
     "wouter": "^3.3.5",
     "ws": "^8.18.0",
     "zod": "^3.23.8",
-    "zod-validation-error": "^3.4.0"
-    "multer":"^q.4.5-lts.1"
+    "zod-validation-error": "^3.4.0",
+    "multer":"^1.4.5-lts.1"
   },
   "devDependencies": {
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
@@ -99,7 +99,7 @@
     "tailwindcss": "^3.4.14",
     "tsx": "^4.19.1",
     "typescript": "5.6.3",
-    "vite": "^5.4.9"
+    "vite": "^5.4.9",
     "@types/multer": "^1.4.11"
   },
   "optionalDependencies": {
