@@ -5,6 +5,8 @@ import { insertUserSchema } from "@shared/schema";
 import { type InsertUser, type User, type Tweet, type Like, type TweetWithUser } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import session from "express-session";
+import { randomBytes } from "crypto";
+import { hashPassword } from "../auth";
 
 export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
@@ -16,7 +18,7 @@ export interface IStorage {
   createTweet(tweet: { content: string; userId: number; mediaData?: string | null; parentId?: number; isComment?: boolean; }): Promise<Tweet>;
   getTweetById(id: number): Promise<Tweet | undefined>;
   deleteTweet(id: number): Promise<void>;
-  createLike(like: { userId: number; tweetId: number }): Promise<void>; // [CORRIGIDO] Alterado de Promise<Like> para Promise<void>
+  createLike(like: { userId: number; tweetId: number }): Promise<void>;
   deleteLike(userId: number, tweetId: number): Promise<void>;
   getLike(userId: number, tweetId: number): Promise<Like | undefined>;
   getRandomUsers(excludeUserId: number, limit: number): Promise<User[]>;
@@ -29,6 +31,7 @@ export interface IStorage {
   deleteRepost(userId: number, tweetId: number): Promise<void>;
   getReposts(tweetId: number): Promise<(Repost & { user: User | null })[]>;
   getNonAdminUsers(): Promise<User[]>;
+  resetUserPassword(userId: number): Promise<string>; // [ADICIONADO] Nova função na interface
 }
 
 const PostgresSessionStore = connectPg(session);
@@ -49,9 +52,8 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .select()
       .from(users)
-      .where(eq(users.isAdmin, false)) // O filtro principal: onde isAdmin é falso
-      .orderBy(users.username); // Ordena por nome para uma lista consistente
-
+      .where(eq(users.isAdmin, false))
+      .orderBy(users.username);
     return result;
   }
 
@@ -172,7 +174,6 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  // [CORRIGIDO] Removido o 'await tx' extra que causava o erro de sintaxe
   async deleteLike(userId: number, tweetId: number): Promise<void> {
     await db.transaction(async (tx) => {
       await tx
@@ -260,6 +261,23 @@ export class DatabaseStorage implements IStorage {
         with: { user: true },
         orderBy: desc(reposts.createdAt)
     });
+  }
+
+  // [ADICIONADO] Nova função para redefinir a senha
+  async resetUserPassword(userId: number): Promise<string> {
+    // Gera uma senha temporária simples e aleatória
+    const newPassword = `mudar${randomBytes(3).toString('hex')}`;
+    
+    // Usa a sua função já existente para criptografar a nova senha
+    const hashedPassword = await hashPassword(newPassword);
+
+    // Atualiza o utilizador no banco de dados com a nova senha
+    await db.update(users)
+      .set({ password: hashedPassword })
+      .where(eq(users.id, userId));
+    
+    // Retorna a senha em texto plano para ser exibida ao admin
+    return newPassword;
   }
 }
 

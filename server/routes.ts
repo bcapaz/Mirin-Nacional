@@ -11,7 +11,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
   
   // --- ROTAS GET ---
-
   app.get("/api/tweets", async (req, res) => {
     try {
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
@@ -93,7 +92,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // --- ROTAS POST ---
-
   app.post("/api/tweets", upload.single('media'), async (req, res) => {
     try {
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
@@ -201,9 +199,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
   });
+  
+  // [ADICIONADO] Nova rota segura para redefinir a senha
+  app.post("/api/admin/users/:id/reset-password", async (req, res) => {
+    try {
+      // @ts-ignore
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Acesso negado. Apenas para administradores." });
+      }
+
+      const userIdToReset = parseInt(req.params.id, 10);
+      if (isNaN(userIdToReset)) {
+          return res.status(400).json({ message: "ID de utilizador inválido." });
+      }
+
+      const newPassword = await storage.resetUserPassword(userIdToReset);
+
+      return res.status(200).json({ success: true, newPassword: newPassword });
+
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
 
   // --- ROTAS DELETE ---
-
   app.delete("/api/tweets/:id/like", async (req, res) => {
     try {
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
