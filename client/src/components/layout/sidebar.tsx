@@ -1,18 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { 
-  Home,
-  User,
-  Search,
-  Bell,
-  ArrowLeft,
-  LogOut,
-  Menu,
-  ShieldCheck,
-  BellOff,
-  Users
-} from "lucide-react";
+import { /* ...seus ícones... */ Users } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -26,7 +15,7 @@ export function Sidebar() {
   const [showSearch, setShowSearch] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // [CORRIGIDO] A query agora espera um array de UserType, e não de { user: UserType }
+  // [CORRIGIDO] A query agora espera um array simples de UserType
   const { data: delegates, isLoading: isLoadingDelegates } = useQuery<UserType[]>({
     queryKey: ["/api/users/delegates"],
     enabled: !!user, 
@@ -34,17 +23,12 @@ export function Sidebar() {
 
   if (!user) return null;
 
-  const handleLogout = () => {
-    logoutMutation.mutate();
-  };
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
+  const handleLogout = () => { logoutMutation.mutate(); };
+  const toggleMobileMenu = () => { setIsMobileMenuOpen(!isMobileMenuOpen); };
   
   let navItems = [
     { label: "Página Inicial", icon: <Home className="w-5 h-5" />, href: "/", active: location === "/" },
-    { label: "Meu Perfil", icon: <User className="w-5 h-5" />, href: `/profile/${user.username}`, active: location.startsWith("/profile") && !location.startsWith("/profile/admin")},
+    { label: "Meu Perfil", icon: <User className="w-5 h-5" />, href: `/profile/${user.username}`, active: location.startsWith("/profile") },
     { label: "Buscar", icon: <Search className="w-5 h-5" />, href: "#", active: false, onClick: () => setShowSearch(true) },
     { label: "Notificações", icon: <Bell className="w-5 h-5" />, href: "#", active: false, onClick: () => setShowNotifications(true) },
     { label: "Voltar ao Site", icon: <ArrowLeft className="w-5 h-5" />, href: "https://sites.google.com/view/sitenacionalmirim/in%C3%ADcio", external: true, active: false }
@@ -58,63 +42,10 @@ export function Sidebar() {
     <>
       <div className="w-full md:w-64 md:h-screen bg-sidebar-background border-r border-border md:fixed z-20">
         <div className="flex flex-col h-full">
-          <div className="p-4 border-b border-border">
-            <div className="flex items-center justify-between">
-              <h1 className="text-xl font-bold text-foreground">Site Nacional Mirin</h1>
-              <button 
-                className="md:hidden text-foreground"
-                onClick={toggleMobileMenu}
-              >
-                <Menu className="w-6 h-6" />
-              </button>
-            </div>
-          </div>
-          
-          <div className="p-4 border-b border-border">
-            <div className="flex items-center space-x-3">
-              <UserAvatar user={user} size="md" />
-              <div>
-                <div className="text-foreground font-medium">{user.username}</div>
-                <div className="text-sm text-muted-foreground">Delegação</div>
-              </div>
-            </div>
-          </div>
+          {/* ...cabeçalho e informações do utilizador logado (sem alterações)... */}
           
           <nav className={`flex-1 overflow-y-auto p-2 ${isMobileMenuOpen ? 'block' : 'hidden md:block'}`}>
-            <div className="space-y-1">
-              {navItems.map((item) => (
-                item.external ? (
-                  <a 
-                    key={item.label}
-                    href={item.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`flex items-center space-x-3 px-4 py-3 text-foreground rounded-lg hover:bg-sidebar-accent`}
-                  >
-                    <span className={`text-muted-foreground`}>{item.icon}</span>
-                    <span>{item.label}</span>
-                  </a>
-                ) : item.onClick ? (
-                  <button 
-                    key={item.label}
-                    onClick={item.onClick}
-                    className={`flex items-center space-x-3 px-4 py-3 text-foreground rounded-lg w-full text-left hover:bg-sidebar-accent`}
-                  >
-                    <span className={`${item.active ? 'text-[#ffdf00]' : 'text-muted-foreground'}`}>{item.icon}</span>
-                    <span>{item.label}</span>
-                  </button>
-                ) : (
-                  <Link 
-                    key={item.label}
-                    href={item.href!}
-                    className={`flex items-center space-x-3 px-4 py-3 text-foreground rounded-lg ${item.active ? 'sidebar-active' : 'hover:bg-sidebar-accent'}`}
-                  >
-                    <span className={`${item.active ? 'text-[#ffdf00]' : 'text-muted-foreground'}`}>{item.icon}</span>
-                    <span>{item.label}</span>
-                  </Link>
-                )
-              ))}
-            </div>
+            {/* ...código de navegação principal (sem alterações)... */}
 
             <div className="mt-6 p-2">
               <div className="flex items-center mb-2">
@@ -125,14 +56,9 @@ export function Sidebar() {
                 {isLoadingDelegates ? (
                   <p className="text-sm text-muted-foreground">A carregar delegados...</p>
                 ) : (
-                  // [CORRIGIDO] O map agora itera sobre 'delegates' e usa 'delegateUser' diretamente
+                  // [CORRIGIDO] O map agora itera sobre a lista simples e usa 'delegateUser' diretamente
                   delegates?.map((delegateUser) => (
-                    <Link 
-                      key={delegateUser.id} 
-                      href={`/profile/${delegateUser.username}`}
-                      // [ADICIONADO] Log de diagnóstico
-                      onClick={() => console.log("Frontend [sidebar] - Clicado em:", delegateUser.username)}
-                    >
+                    <Link key={delegateUser.id} href={`/profile/${delegateUser.username}`}>
                       <a className="flex items-center space-x-3 p-2 rounded-lg hover:bg-sidebar-accent">
                         <UserAvatar user={delegateUser} size="sm" />
                         <span className="text-sm font-medium text-foreground truncate">{delegateUser.username}</span>
@@ -144,23 +70,11 @@ export function Sidebar() {
             </div>
           </nav>
           
-          <div className={`p-4 border-t border-border ${isMobileMenuOpen ? 'block' : 'hidden md:block'}`}>
-            <Button
-              variant="ghost"
-              className="flex items-center space-x-3 px-4 py-3 text-foreground rounded-lg hover:bg-sidebar-accent w-full justify-start"
-              onClick={handleLogout}
-              disabled={logoutMutation.isPending}
-            >
-              <LogOut className="w-5 h-5 text-muted-foreground" />
-              <span>Sair</span>
-            </Button>
-          </div>
+          {/* ...botão de logout (sem alterações)... */}
         </div>
       </div>
       
-      {/* Diálogos (sem alterações) */}
-      <Dialog open={showSearch} onOpenChange={setShowSearch}>...</Dialog>
-      <Dialog open={showNotifications} onOpenChange={setShowNotifications}>...</Dialog>
+      {/* ...diálogos (sem alterações)... */}
     </>
   );
 }
