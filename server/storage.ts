@@ -12,7 +12,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string }): Promise<User>;
+  updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string; password?: string }): Promise<User>;
   getAllTweets(currentUserId: number): Promise<TweetWithUser[]>;
   getUserTweets(userId: number, currentUserId: number): Promise<TweetWithUser[]>;
   createTweet(tweet: { content: string; userId: number; mediaData?: string | null; parentId?: number; isComment?: boolean; }): Promise<Tweet>;
@@ -31,7 +31,6 @@ export interface IStorage {
   deleteRepost(userId: number, tweetId: number): Promise<void>;
   getReposts(tweetId: number): Promise<(Repost & { user: User | null })[]>;
   getNonAdminUsers(): Promise<User[]>;
-  resetUserPassword(userId: number): Promise<string>; // [ADICIONADO]
 }
 
 const PostgresSessionStore = connectPg(session);
@@ -229,13 +228,11 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  // [ADICIONADO] Nova função para redefinir a senha pelo admin
-  async resetUserPassword(userId: number): Promise<string> {
-    const newPassword = `mudar${randomBytes(3).toString('hex')}`;
-    const hashedPassword = await hashPassword(newPassword);
-    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
-    return newPassword;
+  async updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string; password?: string }): Promise<User> {
+    const [updatedUser] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return updatedUser;
   }
+
 }
 
 export const storage = new DatabaseStorage();

@@ -1,9 +1,10 @@
 import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
-import { setupAuth } from "./auth";
+import { setupAuth, hashPassword } from "./auth"; // Importamos hashPassword
 import { storage } from "./storage";
 import multer from 'multer';
+import { randomBytes } from "crypto"; // Importamos randomBytes
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -193,7 +194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
   });
-  
+
   // [ADICIONADO] Nova rota segura para redefinir a senha
   app.post("/api/admin/users/:id/reset-password", async (req, res) => {
     try {
@@ -201,16 +202,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.isAuthenticated() || !req.user.isAdmin) {
         return res.status(403).json({ message: "Acesso negado. Apenas para administradores." });
       }
-
       const userIdToReset = parseInt(req.params.id, 10);
       if (isNaN(userIdToReset)) {
-          return res.status(400).json({ message: "ID de utilizador inválido." });
+        return res.status(400).json({ message: "ID de utilizador inválido." });
       }
-
-      const newPassword = await storage.resetUserPassword(userIdToReset);
-
+      // A lógica de criação de senha agora vive aqui, na rota, para evitar dependências circulares.
+      const newPassword = `mudar${randomBytes(3).toString('hex')}`;
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUser(userIdToReset, { password: hashedPassword });
       return res.status(200).json({ success: true, newPassword: newPassword });
-
     } catch (error) {
       console.error("Error resetting password:", error);
       res.status(500).json({ message: "Erro interno do servidor" });
