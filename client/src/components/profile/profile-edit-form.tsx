@@ -43,16 +43,29 @@ export function ProfileEditForm({ onSuccess }: { onSuccess?: () => void }) {
       
       return response.json();
     },
+    // [CORRIGIDO] Adicionadas mais duas linhas para invalidar os feeds de tweets
     onSuccess: () => {
       setOpen(false);
+      
+      // Invalida os dados do usuário logado (ex: para a sidebar)
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      
       if (user) {
+        // Invalida os dados do perfil (para o cabeçalho da página de perfil)
         queryClient.invalidateQueries({ queryKey: [`/api/profile/${user.username}`] });
+        
+        // [ADICIONADO] Invalida a lista de tweets do perfil
+        queryClient.invalidateQueries({ queryKey: [`/api/profile/${user.username}/tweets`] });
       }
+
+      // [ADICIONADO] Invalida a lista de tweets do feed principal
+      queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
+
       toast({
         title: "Perfil atualizado!",
         description: "Seu perfil foi atualizado com sucesso.",
       });
+
       if (onSuccess) onSuccess();
     },
     onError: (error: Error) => {
@@ -68,7 +81,6 @@ export function ProfileEditForm({ onSuccess }: { onSuccess?: () => void }) {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Verificar tamanho (máximo 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "Arquivo muito grande",
@@ -78,7 +90,6 @@ export function ProfileEditForm({ onSuccess }: { onSuccess?: () => void }) {
       return;
     }
     
-    // Verificar tipo (apenas imagens)
     if (!file.type.startsWith("image/")) {
       toast({
         title: "Tipo de arquivo não suportado",
