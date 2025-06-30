@@ -248,6 +248,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/users/delegates", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+    
+      // Usa a função que criámos para buscar todos os não-admins
+      const delegates = await storage.getNonAdminUsers();
+    
+      // O seu frontend parece esperar um objeto com uma propriedade 'user',
+      // então vamos manter essa estrutura para garantir compatibilidade.
+      const delegateList = delegates.map(user => ({ user }));
+
+      return res.json(delegateList);
+    } catch (error) {
+      console.error("Error fetching delegates:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
