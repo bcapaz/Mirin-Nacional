@@ -1,12 +1,12 @@
 import { db } from "@db";
 import { users, tweets, likes, reposts, type Comment, type Repost } from "@shared/schema";
-import { eq, and, desc, sql, ne } from "drizzle-orm";
+import { eq, and, desc, sql, ne, ilike } from "drizzle-orm";
 import { insertUserSchema } from "@shared/schema";
 import { type InsertUser, type User, type Tweet, type Like, type TweetWithUser } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import session from "express-session";
 import { randomBytes } from "crypto";
-import { hashPassword } from "../auth";
+import { hashPassword } from "./auth";
 
 export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
@@ -23,6 +23,7 @@ export interface IStorage {
   getLike(userId: number, tweetId: number): Promise<Like | undefined>;
   getRandomUsers(excludeUserId: number, limit: number): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
+  getNonAdminUsers(): Promise<User[]>;
   sessionStore: session.Store;
   createComment(comment: { content: string; userId: number; tweetId: number }): Promise<Tweet>;
   getComments(tweetId: number): Promise<TweetWithUser[]>;
@@ -30,7 +31,7 @@ export interface IStorage {
   createRepost(userId: number, tweetId: number): Promise<void>;
   deleteRepost(userId: number, tweetId: number): Promise<void>;
   getReposts(tweetId: number): Promise<(Repost & { user: User | null })[]>;
-  getNonAdminUsers(): Promise<User[]>;
+  resetUserPassword(userId: number): Promise<string>;
 }
 
 const PostgresSessionStore = connectPg(session);
@@ -47,15 +48,6 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getNonAdminUsers(): Promise<User[]> {
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.isAdmin, false))
-      .orderBy(users.username);
-    return result;
-  }
-
   async createUser(user: InsertUser): Promise<User> {
     const validatedData = insertUserSchema.parse(user);
     const result = await db.insert(users).values(validatedData).returning();
@@ -70,23 +62,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return await db.query.users.findFirst({ where: eq(users.username, username) });
+    return await db.query.users.findFirst({
+      where: ilike(users.username, username)
+    });
   }
 
-  async updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string }): Promise<User> {
-    const [updatedUser] = await db.update(users).set(data).where(eq(users.id, id)).returning();
-    return updatedUser;
+  // [CORRIGIDO] Apenas uma versão da função, a que aceita 'password'
+  async updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string; password?: string }): Promise<User> {
+    const result = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    if (!result[0]) {
+      throw new Error("Utilizador não encontrado para atualização.");
+    }
+    return result[0];
   }
 
   async getAllTweets(currentUserId: number): Promise<TweetWithUser[]> {
     const result = await db.select({
-      id: tweets.id,
-      content: tweets.content,
-      mediaData: tweets.mediaData,
-      userId: tweets.userId,
-      createdAt: tweets.createdAt,
-      likeCount: tweets.likeCount,
-      repostCount: tweets.repostCount,
+      id: tweets.id, content: tweets.content, mediaData: tweets.mediaData, userId: tweets.userId,
+      createdAt: tweets.createdAt, likeCount: tweets.likeCount, repostCount: tweets.repostCount,
       commentCount: sql<number>`(SELECT count(*) FROM ${tweets} AS comments WHERE comments.parent_id = ${tweets.id})`.mapWith(Number),
       user: { id: users.id, username: users.username, name: users.name, profileImage: users.profileImage, avatarColor: users.avatarColor },
       isLiked: sql<boolean>`EXISTS(SELECT 1 FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id} AND ${likes.userId} = ${currentUserId})`.mapWith(Boolean),
@@ -178,6 +171,10 @@ export class DatabaseStorage implements IStorage {
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(users.username);
   }
+  
+  async getNonAdminUsers(): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.isAdmin, false)).orderBy(users.username);
+  }
 
   async createComment(comment: { content: string; userId: number; tweetId: number; }): Promise<Tweet> {
     const [newComment] = await db.insert(tweets).values({
@@ -228,11 +225,12 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async updateUser(id: number, data: { username?: string; bio?: string; profileImage?: string; password?: string }): Promise<User> {
-    const [updatedUser] = await db.update(users).set(data).where(eq(users.id, id)).returning();
-    return updatedUser;
+  async resetUserPassword(userId: number): Promise<string> {
+    const newPassword = `mudar${randomBytes(3).toString('hex')}`;
+    const hashedPassword = await hashPassword(newPassword);
+    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
+    return newPassword;
   }
-
 }
 
 export const storage = new DatabaseStorage();
