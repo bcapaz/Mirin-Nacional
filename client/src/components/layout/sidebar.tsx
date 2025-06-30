@@ -11,13 +11,13 @@ import {
   Menu,
   ShieldCheck,
   BellOff,
-  Users // [NOVO] Ícone para a nova secção
+  Users
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useQuery } from "@tanstack/react-query"; // [NOVO] Import para buscar dados
-import { User as UserType } from "@shared/schema"; // [NOVO] Import do tipo User
+import { useQuery } from "@tanstack/react-query";
+import { User as UserType } from "@shared/schema";
 
 export function Sidebar() {
   const { user, logoutMutation } = useAuth();
@@ -26,12 +26,11 @@ export function Sidebar() {
   const [showSearch, setShowSearch] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // [NOVO] Hook para buscar a lista de delegados da nossa nova API
-  const { data: delegates, isLoading: isLoadingDelegates } = useQuery<{ user: UserType }[]>({
+  const { data: delegatesData, isLoading: isLoadingDelegates } = useQuery<{ user: UserType }[]>({
     queryKey: ["/api/users/delegates"],
-    // O useAuth garante que 'user' existe, então a query só roda quando o utilizador está logado
     enabled: !!user, 
   });
+  const delegates = delegatesData || [];
 
   if (!user) return null;
 
@@ -83,12 +82,41 @@ export function Sidebar() {
           
           <nav className={`flex-1 overflow-y-auto p-2 ${isMobileMenuOpen ? 'block' : 'hidden md:block'}`}>
             <div className="space-y-1">
+              {/* [CORRIGIDO] Lógica de navegação restaurada */}
               {navItems.map((item) => (
-                // ... seu código de navegação aqui, sem alterações ...
+                item.external ? (
+                  <a 
+                    key={item.label}
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`flex items-center space-x-3 px-4 py-3 text-foreground rounded-lg hover:bg-sidebar-accent`}
+                  >
+                    <span className={`text-muted-foreground`}>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </a>
+                ) : item.onClick ? (
+                  <button 
+                    key={item.label}
+                    onClick={item.onClick}
+                    className={`flex items-center space-x-3 px-4 py-3 text-foreground rounded-lg w-full text-left hover:bg-sidebar-accent`}
+                  >
+                    <span className={`${item.active ? 'text-[#ffdf00]' : 'text-muted-foreground'}`}>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ) : (
+                  <Link 
+                    key={item.label}
+                    href={item.href!}
+                    className={`flex items-center space-x-3 px-4 py-3 text-foreground rounded-lg ${item.active ? 'sidebar-active' : 'hover:bg-sidebar-accent'}`}
+                  >
+                    <span className={`${item.active ? 'text-[#ffdf00]' : 'text-muted-foreground'}`}>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </Link>
+                )
               ))}
             </div>
 
-            {/* [NOVO] Secção para exibir a lista de delegados */}
             <div className="mt-6 p-2">
               <div className="flex items-center mb-2">
                 <Users className="w-5 h-5 mr-3 text-muted-foreground"/>
@@ -98,7 +126,7 @@ export function Sidebar() {
                 {isLoadingDelegates ? (
                   <p className="text-sm text-muted-foreground">A carregar delegados...</p>
                 ) : (
-                  delegates?.map(({ user: delegateUser }) => (
+                  delegates.map(({ user: delegateUser }) => (
                     <Link key={delegateUser.id} href={`/profile/${delegateUser.username}`}>
                       <a className="flex items-center space-x-3 p-2 rounded-lg hover:bg-sidebar-accent">
                         <UserAvatar user={delegateUser} size="sm" />
@@ -125,9 +153,32 @@ export function Sidebar() {
         </div>
       </div>
       
-      {/* Dialogs de Busca e Notificações (sem alterações) */}
-      <Dialog open={showSearch} onOpenChange={setShowSearch}>...</Dialog>
-      <Dialog open={showNotifications} onOpenChange={setShowNotifications}>...</Dialog>
+      {/* [CORRIGIDO] Diálogos restaurados */}
+      <Dialog open={showSearch} onOpenChange={setShowSearch}>
+        <DialogContent className="bg-sidebar-background border-border text-foreground">
+          <DialogHeader>
+            <DialogTitle>Resultados da Busca</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-center">
+            <Search className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <p className="text-foreground">Nenhum resultado encontrado</p>
+            <p className="text-sm text-muted-foreground mt-2">Tente com termos diferentes ou aguarde novos conteúdos.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={showNotifications} onOpenChange={setShowNotifications}>
+        <DialogContent className="bg-sidebar-background border-border text-foreground">
+          <DialogHeader>
+            <DialogTitle>Notificações</DialogTitle>
+          </DialogHeader>
+          <div className="py-8 text-center">
+            <BellOff className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <p className="text-foreground">Não há notificações no momento</p>
+            <p className="text-sm text-muted-foreground mt-2">Notificaremos você quando houver novas interações.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
