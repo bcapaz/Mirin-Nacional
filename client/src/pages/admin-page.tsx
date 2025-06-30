@@ -18,18 +18,15 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+// [CORRIGIDO] Usando apenas Dialog, que já existe no seu projeto
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -41,18 +38,15 @@ export default function AdminPage() {
   const [userToReset, setUserToReset] = useState<User | null>(null);
 
   useEffect(() => {
-    if (user === null) {
-      navigate("/auth");
-    } else if (user && !user.isAdmin) {
-      navigate("/");
-    }
+    if (user === null) navigate("/auth");
+    else if (user && !user.isAdmin) navigate("/");
   }, [user, navigate]);
 
   const { data: allUsers, isLoading: isLoadingUsers } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
     enabled: !!user?.isAdmin,
   });
-
+  
   const resetPasswordMutation = useMutation({
     mutationFn: (variables: { userId: number; newPass: string }) => 
       apiRequest("POST", `/api/admin/users/${variables.userId}/reset-password`, { newPassword: variables.newPass }),
@@ -195,7 +189,8 @@ export default function AdminPage() {
                                   onClick={() => handleOpenResetDialog(tableUser)}
                                   disabled={resetPasswordMutation.isPending && userToReset?.id === tableUser.id}
                                 >
-                                  <KeyRound className="h-4 w-4" />
+                                  <KeyRound className="h-4 w-4 mr-2" />
+                                  Redefinir Senha
                                 </Button>
                               </TableCell>
                             </TableRow>
@@ -208,14 +203,36 @@ export default function AdminPage() {
               </TabsContent>
               
               <TabsContent value="export">
-                {/* ... seu código para exportar dados ... */}
+                 <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+                    <h2 className="text-lg font-medium mb-4">Exportar Dados</h2>
+                    <p className="text-sm text-muted-foreground mb-6">
+                      Baixe um arquivo CSV com as credenciais de todas as delegações para referência.
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      onClick={downloadCredentials}
+                      disabled={!allUsers || allUsers.length === 0}
+                    >
+                      Baixar Lista de Delegações
+                    </Button>
+                    <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                      <h3 className="text-amber-800 font-medium mb-2 flex items-center">
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        Aviso de Privacidade
+                      </h3>
+                      <p className="text-sm text-amber-700">
+                        Todos os dados exportados são confidenciais. Não compartilhe as credenciais com pessoas não autorizadas.
+                        As senhas dos usuários são armazenadas de forma segura e não podem ser visualizadas mesmo por administradores.
+                      </p>
+                    </div>
+                  </div>
               </TabsContent>
             </Tabs>
           </div>
         </div>
       </div>
 
-      <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+      <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Redefinir Senha</DialogTitle>
@@ -225,15 +242,16 @@ export default function AdminPage() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="newPassword" className="text-right">
+              {/* [CORRIGIDO] Usando <label> e <input> HTML padrão */}
+              <label htmlFor="newPassword" className="text-right">
                 Nova Senha
-              </Label>
-              <Input
+              </label>
+              <input
                 id="newPassword"
                 type="text"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="col-span-3"
+                className="col-span-3 p-2 border rounded-md bg-background text-foreground"
                 placeholder="Mínimo de 6 caracteres"
               />
             </div>
@@ -246,7 +264,7 @@ export default function AdminPage() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </AlertDialog>
+      </Dialog>
     </>
   );
 }
