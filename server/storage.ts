@@ -28,6 +28,7 @@ export interface IStorage {
   createRepost(userId: number, tweetId: number): Promise<void>;
   deleteRepost(userId: number, tweetId: number): Promise<void>;
   getReposts(tweetId: number): Promise<(Repost & { user: User | null })[]>;
+  getNonAdminUsers(): Promise<User[]>;
 }
 
 const PostgresSessionStore = connectPg(session);
@@ -42,6 +43,16 @@ export class DatabaseStorage implements IStorage {
       },
       createTableIfMissing: true
     });
+  }
+
+  async getNonAdminUsers(): Promise<User[]> {
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.isAdmin, false)) // O filtro principal: onde isAdmin é falso
+      .orderBy(users.username); // Ordena por nome para uma lista consistente
+
+    return result;
   }
 
   async createUser(user: InsertUser): Promise<User> {
