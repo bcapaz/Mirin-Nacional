@@ -11,19 +11,24 @@ import { useAuth } from "@/hooks/use-auth";
 import { ProfileEditForm } from "@/components/profile/profile-edit-form";
 
 export default function ProfilePage() {
-  const { username } = useParams<{ username: string }>();
+  // [CORRIGIDO] Lemos o 'identifier' (que agora será um ID) da URL
+  const { identifier } = useParams<{ identifier: string }>();
   const { user: currentUser } = useAuth();
-  const isOwnProfile = currentUser?.username === username;
 
+  // [CORRIGIDO] A query agora usa o 'identifier' para buscar o perfil
   const { data: profileUser, isLoading: isLoadingProfile } = useQuery<User>({
-    queryKey: [`/api/profile/${username}`],
-    enabled: !!username,
+    queryKey: [`/api/profile/${identifier}`],
+    enabled: !!identifier,
   });
 
+  // [CORRIGIDO] A query dos tweets também usa o 'identifier'
   const { data: userTweets, isLoading: isLoadingTweets, isError, error } = useQuery<TweetWithUser[]>({
-    queryKey: [`/api/profile/${username}/tweets`],
-    enabled: !!username,
+    queryKey: [`/api/profile/${identifier}/tweets`],
+    enabled: !!identifier,
   });
+
+  // [CORRIGIDO] A verificação de perfil próprio agora compara os IDs
+  const isOwnProfile = currentUser?.id === profileUser?.id;
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
@@ -77,7 +82,7 @@ export default function ProfilePage() {
                         <h1 className="text-2xl font-bold text-foreground">{profileUser.username}</h1>
                         {profileUser.name && !isOwnProfile && (
                           <p className="text-muted-foreground text-sm">
-                            Delegação da {profileUser.name}
+                            Delegação de {profileUser.name}
                           </p>
                         )}
                       </div>
