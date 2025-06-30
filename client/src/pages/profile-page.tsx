@@ -91,7 +91,7 @@ export default function ProfilePage() {
                 <div className="text-center">
                   <p className="text-muted-foreground">Este usuário não existe.</p>
                 </div>
-              )}
+              ):
             </div>
             
             {/* Tweets */}
