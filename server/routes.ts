@@ -217,23 +217,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // @ts-ignore
       if (!req.isAuthenticated() || !req.user.isAdmin) {
-        return res.status(403).json({ message: "Acesso negado. Apenas para administradores." });
+        return res.status(403).json({ message: "Acesso negado." });
       }
+
       const userIdToReset = parseInt(req.params.id, 10);
       if (isNaN(userIdToReset)) {
         return res.status(400).json({ message: "ID de utilizador inválido." });
       }
-      // A lógica de criação de senha agora vive aqui, na rota, para evitar dependências circulares.
-      const newPassword = `mudar${randomBytes(3).toString('hex')}`;
+
+    // [MODIFICADO] Lemos a nova senha do corpo do pedido
+      const { newPassword } = req.body;
+      if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
+          return res.status(400).json({ message: "A nova senha deve ter pelo menos 6 caracteres."});
+      }
+
+    // Criptografa a senha fornecida pelo admin
       const hashedPassword = await hashPassword(newPassword);
+    
+    // Usa a função updateUser para guardar a nova senha
       await storage.updateUser(userIdToReset, { password: hashedPassword });
-      return res.status(200).json({ success: true, newPassword: newPassword });
+  
+    // Já não precisamos de retornar a senha, apenas uma mensagem de sucesso
+      return res.status(200).json({ success: true, message: "Senha redefinida com sucesso." });
+
     } catch (error) {
       console.error("Error resetting password:", error);
       res.status(500).json({ message: "Erro interno do servidor" });
     }
   });
-
   // --- ROTAS DELETE ---
   app.delete("/api/tweets/:id/like", async (req, res) => {
     try {
