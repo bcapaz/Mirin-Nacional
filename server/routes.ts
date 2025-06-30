@@ -11,6 +11,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
   
   // --- ROTAS GET ---
+
   app.get("/api/tweets", async (req, res) => {
     try {
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
@@ -23,15 +24,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // [MODIFICADO] As rotas de perfil agora usam um ':identifier' genérico
   app.get("/api/profile/:identifier", async (req, res) => {
     try {
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-
       const identifier = req.params.identifier;
       let user;
 
-      // Se o identificador for um número, busca por ID. Senão, busca por nome.
       if (!isNaN(parseInt(identifier, 10))) {
         user = await storage.getUser(parseInt(identifier, 10));
       } else {
@@ -51,7 +49,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/profile/:identifier/tweets", async (req, res) => {
     try {
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-      
       const identifier = req.params.identifier;
       let user;
 
@@ -72,14 +69,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // [MODIFICADO] A rota de delegados agora retorna uma lista simples.
   app.get("/api/users/delegates", async (req, res) => {
     try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
+      if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
       const delegates = await storage.getNonAdminUsers();
-      return res.json(delegates); // Retorna a lista diretamente
+      return res.json(delegates);
     } catch (error) {
       console.error("Error fetching delegates:", error);
       res.status(500).json({ message: "Internal server error" });
@@ -98,38 +92,166 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // --- ROTAS POST / DELETE etc. (sem mais alterações) ---
-  
+  // --- ROTAS POST ---
+
   app.post("/api/tweets", upload.single('media'), async (req, res) => {
-    //...código original...
+    try {
+      if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+      const content = req.body.content || "";
+      let mediaData = null;
+      if (req.file) {
+        const b64 = req.file.buffer.toString("base64");
+        mediaData = `data:${req.file.mimetype};base64,${b64}`;
+      }
+      if (!content && !mediaData) return res.status(400).json({ message: "Conteúdo ou mídia são obrigatórios" });
+      const newTweet = await storage.createTweet({
+        content,
+        // @ts-ignore
+        userId: req.user.id,
+        mediaData
+      });
+      return res.status(201).json(newTweet);
+    } catch (error) {
+      console.error("Error creating tweet:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
   });
 
   app.post("/api/tweets/:id/like", async (req, res) => {
-    //...código original...
-  });
-
-  app.delete("/api/tweets/:id/like", async (req, res) => {
-    //...código original...
+    try {
+      if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+      const tweetId = parseInt(req.params.id);
+      if (isNaN(tweetId)) return res.status(400).json({ message: "Invalid tweet ID" });
+      // @ts-ignore
+      const userId = req.user.id;
+      const existingLike = await storage.getLike(userId, tweetId);
+      if (existingLike) {
+        return res.status(409).json({ message: "Tweet já foi curtido por este usuário" });
+      }
+      await storage.createLike({ userId, tweetId });
+      return res.status(201).json({ message: "Tweet liked successfully" });
+    } catch (error) {
+      console.error("Error liking tweet:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
   });
 
   app.post("/api/profile/update", upload.single('profileImage'), async (req, res) => {
-    //...código original...
-  });
-
-  app.delete("/api/admin/tweets/:id", async (req, res) => {
-    //...código original...
+    try {
+      if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+      const { username, bio } = req.body;
+      let profileImage: string | null = null;
+      if (req.file) {
+        const b64 = req.file.buffer.toString("base64");
+        profileImage = `data:${req.file.mimetype};base64,${b64}`;
+      }
+      if (!username || !username.trim()) return res.status(400).json({ message: "Nome de delegação é obrigatório" });
+      // @ts-ignore
+      if (username !== req.user.username) {
+        const existingUser = await storage.getUserByUsername(username);
+        if (existingUser) return res.status(400).json({ message: "Nome de delegação já está em uso" });
+      }
+      const updateData: { username: string; bio?: string; profileImage?: string } = { username, bio };
+      if (profileImage) {
+        updateData.profileImage = profileImage;
+      }
+      // @ts-ignore
+      const updatedUser = await storage.updateUser(req.user.id, updateData);
+      return res.status(200).json(updatedUser);
+    } catch (error: any) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ message: error.message || "Erro interno do servidor" });
+    }
   });
 
   app.post("/api/tweets/:id/comments", async (req, res) => {
-    //...código original...
+    try {
+      if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+      const tweetId = parseInt(req.params.id, 10);
+      if (isNaN(tweetId)) return res.status(400).json({ message: "ID de tweet inválido" });
+      const { content } = req.body;
+      if (!content || content.length > 280) return res.status(400).json({ message: "Conteúdo do comentário é inválido" });
+      const newComment = await storage.createComment({
+        content,
+        // @ts-ignore
+        userId: req.user.id,
+        tweetId: tweetId,
+      });
+      res.status(201).json(newComment);
+    } catch (error) {
+      console.error("Erro ao criar comentário:", error);
+      res.status(500).json({ message: "Erro interno ao criar comentário" });
+    }
   });
 
   app.post('/api/tweets/:id/repost', async (req, res) => {
-    //...código original...
+    try {
+      if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+      const tweetId = parseInt(req.params.id);
+      // @ts-ignore
+      const userId = req.user.id;
+      const existingRepost = await storage.getRepost(userId, tweetId);
+      if (existingRepost) {
+        return res.status(409).json({ message: "Tweet já repostado" });
+      }
+      await storage.createRepost(userId, tweetId);
+      return res.status(201).json({ message: "Tweet repostado com sucesso" });
+    } catch (error) {
+      console.error("Error creating repost:", error);
+      return res.status(500).json({ message: "Erro interno do servidor" });
+    }
   });
 
+  // --- ROTAS DELETE ---
+
+  app.delete("/api/tweets/:id/like", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+      const tweetId = parseInt(req.params.id);
+      if (isNaN(tweetId)) return res.status(400).json({ message: "Invalid tweet ID" });
+      // @ts-ignore
+      const userId = req.user.id;
+      const existingLike = await storage.getLike(userId, tweetId);
+      if (!existingLike) {
+        return res.status(404).json({ message: "Like não encontrado para este usuário" });
+      }
+      await storage.deleteLike(userId, tweetId);
+      return res.status(200).json({ message: "Tweet unliked successfully" });
+    } catch (error) {
+      console.error("Error unliking tweet:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
   app.delete('/api/tweets/:id/repost', async (req, res) => {
-    //...código original...
+    try {
+      if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+      const tweetId = parseInt(req.params.id);
+      // @ts-ignore
+      const userId = req.user.id;
+      const existingRepost = await storage.getRepost(userId, tweetId);
+      if (!existingRepost) {
+        return res.status(404).json({ message: "Repost não encontrado" });
+      }
+      await storage.deleteRepost(userId, tweetId);
+      return res.status(200).json({ message: "Repost removido com sucesso" });
+    } catch (error) {
+      console.error("Error deleting repost:", error);
+      return res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
+
+  app.delete("/api/admin/tweets/:id", async (req, res) => {
+    try {
+      // @ts-ignore
+      if (!req.isAuthenticated() || !req.user.isAdmin) return res.status(403).json({ message: "Forbidden" });
+      const tweetId = parseInt(req.params.id);
+      await storage.deleteTweet(tweetId);
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("Error deleting tweet:", error);
+      return res.status(500).json({ message: "Erro interno do servidor" });
+    }
   });
 
   const httpServer = createServer(app);
