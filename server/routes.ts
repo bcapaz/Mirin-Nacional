@@ -43,6 +43,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/users", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user.isAdmin) {
+        return res.status(403).json({ message: "Acesso negado" });
+      }
+ 
+      // Usa a função já existente no seu storage para buscar todos os utilizadores
+      const allUsers = await storage.getAllUsers();
+    
+      return res.json(allUsers);
+    
+    } catch (error) {
+      console.error("Error fetching all users:", error);
+      res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
+
   app.get("/api/profile/:identifier/tweets", async (req, res) => {
     try {
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
