@@ -31,7 +31,6 @@ export function TrendingSidebar() {
         {/* Barra de Pesquisa */}
         <div className="mb-6">
           <form onSubmit={handleSearch}>
-            {/* [CORRIGIDO] Adicionada uma <div> para envolver o ícone e o input */}
             <div className="relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3">
                 <Search className="w-4 h-4 text-muted-foreground" />
