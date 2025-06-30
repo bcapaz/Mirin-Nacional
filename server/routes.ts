@@ -123,38 +123,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/profile/update", upload.single('profileImage'), async (req, res) => {
     try {
+      console.log("ROTA /api/profile/update ACIONADA"); // Diagnóstico 1
+
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-      
+    
       const { username, bio } = req.body;
       let profileImage: string | null = null;
+
+    // Diagnóstico 2: Verificar se o ficheiro foi recebido pelo multer
+      console.log("Conteúdo de req.file:", req.file); 
+    
       if (req.file) {
         const b64 = req.file.buffer.toString("base64");
         profileImage = `data:${req.file.mimetype};base64,${b64}`;
+        console.log("Imagem processada para Base64 (primeiros 50 caracteres):", profileImage.substring(0, 50)); // Diagnóstico 3
       }
       
       if (!username || !username.trim()) return res.status(400).json({ message: "Nome de delegação é obrigatório" });
-      
+    
       // @ts-ignore
       if (username !== req.user.username) {
         const existingUser = await storage.getUserByUsername(username);
         if (existingUser) return res.status(400).json({ message: "Nome de delegação já está em uso" });
       }
-      
+     
       const updateData: { username: string; bio?: string; profileImage?: string } = { username, bio };
       if (profileImage) {
         updateData.profileImage = profileImage;
       }
-      
+
+      // Diagnóstico 4: Verificar o objeto que será enviado para o banco de dados
+      console.log("Dados a serem enviados para storage.updateUser:", updateData);
+    
       // @ts-ignore
       const updatedUser = await storage.updateUser(req.user.id, updateData);
-      
+
+      // Diagnóstico 5: Verificar o que o banco de dados retornou após a atualização
+      console.log("Usuário retornado do banco após o update:", updatedUser);
+    
       return res.status(200).json(updatedUser);
     } catch (error: any) {
       console.error("Error updating profile:", error);
       res.status(500).json({ message: error.message || "Erro interno do servidor" });
     }
   });
-
   app.delete("/api/admin/tweets/:id", async (req, res) => {
     try {
       // @ts-ignore
