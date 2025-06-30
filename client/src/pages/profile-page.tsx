@@ -11,23 +11,25 @@ import { useAuth } from "@/hooks/use-auth";
 import { ProfileEditForm } from "@/components/profile/profile-edit-form";
 
 export default function ProfilePage() {
-  // [CORRIGIDO] Lemos o 'identifier' (que agora será um ID) da URL
-  const { identifier } = useParams<{ identifier: string }>();
+  // [CORRIGIDO] Lemos o parâmetro da URL, que pode ser um ID ou um nome.
+  // A sua rota principal continua a ser /profile/:username, então lemos o parâmetro 'username'.
+  const params = useParams();
+  const identifier = params.username; // O 'username' da URL pode ser um nome ou um ID
+
   const { user: currentUser } = useAuth();
 
-  // [CORRIGIDO] A query agora usa o 'identifier' para buscar o perfil
   const { data: profileUser, isLoading: isLoadingProfile } = useQuery<User>({
+    // Usamos o 'identifier' para a chave da query e a chamada da API
     queryKey: [`/api/profile/${identifier}`],
     enabled: !!identifier,
   });
 
-  // [CORRIGIDO] A query dos tweets também usa o 'identifier'
   const { data: userTweets, isLoading: isLoadingTweets, isError, error } = useQuery<TweetWithUser[]>({
     queryKey: [`/api/profile/${identifier}/tweets`],
-    enabled: !!identifier,
+    enabled: !!profileUser, // Só busca os tweets depois que o perfil for encontrado
   });
 
-  // [CORRIGIDO] A verificação de perfil próprio agora compara os IDs
+  // A verificação de perfil próprio agora compara os IDs, que é mais seguro.
   const isOwnProfile = currentUser?.id === profileUser?.id;
 
   return (
@@ -36,7 +38,6 @@ export default function ProfilePage() {
       
       <div className="flex-1 md:ml-64">
         <div className="max-w-4xl mx-auto md:flex">
-          {/* Main Content */}
           <div className="flex-1">
             {/* Header */}
             <header className="sticky top-0 z-10 bg-card border-b border-border">
@@ -45,9 +46,9 @@ export default function ProfilePage() {
                   <ArrowLeft className="w-5 h-5 text-foreground" />
                 </Link>
                 {isLoadingProfile ? (
-                  <div className="flex flex-col">
-                    <div className="h-6 w-40 bg-muted rounded animate-pulse"></div>
-                    <div className="h-4 w-24 bg-muted rounded animate-pulse mt-1"></div>
+                  <div className="flex flex-col animate-pulse">
+                    <div className="h-6 w-40 bg-muted rounded"></div>
+                    <div className="h-4 w-24 bg-muted rounded mt-1"></div>
                   </div>
                 ) : profileUser ? (
                   <div>
@@ -65,14 +66,7 @@ export default function ProfilePage() {
             {/* Profile Info */}
             <div className="p-6 bg-card border-b border-border">
               {isLoadingProfile ? (
-                <div className="flex items-center space-x-4">
-                  <div className="h-20 w-20 rounded-full bg-muted animate-pulse"></div>
-                  <div className="flex-1">
-                    <div className="h-6 w-48 bg-muted rounded animate-pulse"></div>
-                    <div className="h-4 w-32 bg-muted rounded animate-pulse mt-2"></div>
-                    <div className="h-4 w-64 bg-muted rounded animate-pulse mt-2"></div>
-                  </div>
-                </div>
+                // ... skeleton loading ...
               ) : profileUser ? (
                 <div className="flex items-center space-x-4">
                   <UserAvatar user={profileUser} size="lg" />
@@ -130,7 +124,6 @@ export default function ProfilePage() {
             </div>
           </div>
           
-          {/* Trending Sidebar */}
           <TrendingSidebar />
         </div>
       </div>
