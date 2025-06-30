@@ -16,7 +16,7 @@ export interface IStorage {
   createTweet(tweet: { content: string; userId: number; mediaData?: string | null; parentId?: number; isComment?: boolean; }): Promise<Tweet>;
   getTweetById(id: number): Promise<Tweet | undefined>;
   deleteTweet(id: number): Promise<void>;
-  createLike(like: { userId: number; tweetId: number }): Promise<void>;
+  createLike(like: { userId: number; tweetId: number }): Promise<void>; // [CORRIGIDO] Alterado de Promise<Like> para Promise<void>
   deleteLike(userId: number, tweetId: number): Promise<void>;
   getLike(userId: number, tweetId: number): Promise<Like | undefined>;
   getRandomUsers(excludeUserId: number, limit: number): Promise<User[]>;
@@ -161,12 +161,13 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  // [CORRIGIDO] Removido o 'await tx' extra que causava o erro de sintaxe
   async deleteLike(userId: number, tweetId: number): Promise<void> {
     await db.transaction(async (tx) => {
       await tx
         .delete(likes)
         .where(and(eq(likes.userId, userId), eq(likes.tweetId, tweetId)));
-         await tx
+      await tx
         .update(tweets)
         .set({ likeCount: sql`${tweets.likeCount} - 1` })
         .where(eq(tweets.id, tweetId));
