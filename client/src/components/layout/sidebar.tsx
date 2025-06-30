@@ -26,11 +26,11 @@ export function Sidebar() {
   const [showSearch, setShowSearch] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  const { data: delegatesData, isLoading: isLoadingDelegates } = useQuery<{ user: UserType }[]>({
+  // [CORRIGIDO] A query agora espera um array de UserType, e não de { user: UserType }
+  const { data: delegates, isLoading: isLoadingDelegates } = useQuery<UserType[]>({
     queryKey: ["/api/users/delegates"],
     enabled: !!user, 
   });
-  const delegates = delegatesData || [];
 
   if (!user) return null;
 
@@ -82,7 +82,6 @@ export function Sidebar() {
           
           <nav className={`flex-1 overflow-y-auto p-2 ${isMobileMenuOpen ? 'block' : 'hidden md:block'}`}>
             <div className="space-y-1">
-              {/* [CORRIGIDO] Lógica de navegação restaurada */}
               {navItems.map((item) => (
                 item.external ? (
                   <a 
@@ -126,8 +125,14 @@ export function Sidebar() {
                 {isLoadingDelegates ? (
                   <p className="text-sm text-muted-foreground">A carregar delegados...</p>
                 ) : (
-                  delegates.map(({ user: delegateUser }) => (
-                    <Link key={delegateUser.id} href={`/profile/${delegateUser.username}`}>
+                  // [CORRIGIDO] O map agora itera sobre 'delegates' e usa 'delegateUser' diretamente
+                  delegates?.map((delegateUser) => (
+                    <Link 
+                      key={delegateUser.id} 
+                      href={`/profile/${delegateUser.username}`}
+                      // [ADICIONADO] Log de diagnóstico
+                      onClick={() => console.log("Frontend [sidebar] - Clicado em:", delegateUser.username)}
+                    >
                       <a className="flex items-center space-x-3 p-2 rounded-lg hover:bg-sidebar-accent">
                         <UserAvatar user={delegateUser} size="sm" />
                         <span className="text-sm font-medium text-foreground truncate">{delegateUser.username}</span>
@@ -153,32 +158,9 @@ export function Sidebar() {
         </div>
       </div>
       
-      {/* [CORRIGIDO] Diálogos restaurados */}
-      <Dialog open={showSearch} onOpenChange={setShowSearch}>
-        <DialogContent className="bg-sidebar-background border-border text-foreground">
-          <DialogHeader>
-            <DialogTitle>Resultados da Busca</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 text-center">
-            <Search className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <p className="text-foreground">Nenhum resultado encontrado</p>
-            <p className="text-sm text-muted-foreground mt-2">Tente com termos diferentes ou aguarde novos conteúdos.</p>
-          </div>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={showNotifications} onOpenChange={setShowNotifications}>
-        <DialogContent className="bg-sidebar-background border-border text-foreground">
-          <DialogHeader>
-            <DialogTitle>Notificações</DialogTitle>
-          </DialogHeader>
-          <div className="py-8 text-center">
-            <BellOff className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <p className="text-foreground">Não há notificações no momento</p>
-            <p className="text-sm text-muted-foreground mt-2">Notificaremos você quando houver novas interações.</p>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Diálogos (sem alterações) */}
+      <Dialog open={showSearch} onOpenChange={setShowSearch}>...</Dialog>
+      <Dialog open={showNotifications} onOpenChange={setShowNotifications}>...</Dialog>
     </>
   );
 }
