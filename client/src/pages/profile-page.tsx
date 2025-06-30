@@ -67,7 +67,7 @@ export default function ProfilePage() {
             <div className="p-6 bg-card border-b border-border">
               {isLoadingProfile ? (
                 // ... skeleton loading ...
-              ) : profileUser ? (
+              ) => profileUser ? (
                 <div className="flex items-center space-x-4">
                   <UserAvatar user={profileUser} size="lg" />
                   <div className="flex-1">
