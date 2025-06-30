@@ -31,7 +31,7 @@ export function TrendingSidebar() {
         {/* Barra de Pesquisa */}
         <div className="mb-6">
           <form onSubmit={handleSearch}>
-            {/* [CORRIGIDO] O <span> e o <Input> estão agora dentro de uma <div> pai */}
+            {/* [CORRIGIDO] Adicionada uma <div> para envolver o ícone e o input */}
             <div className="relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3">
                 <Search className="w-4 h-4 text-muted-foreground" />
@@ -60,12 +60,9 @@ export function TrendingSidebar() {
             ))}
           </div>
         </div>
-        
-        {/* A secção "Delegados Importantes" foi removida como solicitado. */}
-        
       </div>
 
-      {/* Diálogos de Busca e Notificações */}
+      {/* Diálogos */}
       <Dialog open={showSearch} onOpenChange={setShowSearch}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>
@@ -74,11 +71,9 @@ export function TrendingSidebar() {
           <div className="py-4 text-center text-muted-foreground">
             <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>Nenhum resultado encontrado para "{searchQuery}"</p>
-            <p className="text-sm mt-2">Tente com termos diferentes ou aguarde novos conteúdos.</p>
           </div>
         </DialogContent>
       </Dialog>
-
       <Dialog open={showNotifications} onOpenChange={setShowNotifications}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>
@@ -87,6 +82,9 @@ export function TrendingSidebar() {
           <div className="py-8 text-center text-muted-foreground">
             <BellOff className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>Não há notificações no momento</p>
-            <p className="text-sm mt-2">Notificaremos você quando houver novas interações.</p>
           </div>
-        </DialogContent
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
