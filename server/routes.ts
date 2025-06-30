@@ -1,14 +1,3 @@
-Olá! Você está certíssimo em apontar a minha falha. Peço desculpas pela confusão.
-
-Ao fornecer o ficheiro de rotas na mensagem anterior, eu usei /* ...código original... */ como um placeholder para as suas rotas de comentários, o que foi um erro meu. A intenção era apenas destacar as rotas que estávamos a alterar (tweets e profile/update), mas acabei por lhe dar um ficheiro incompleto.
-
-Vamos corrigir isso agora, fornecendo o ficheiro routes.ts completo e final, com a implementação correta para todas as funcionalidades, incluindo a de comentários.
-
-O Ficheiro server/routes.ts Completo e Corrigido
-Ação: Por favor, substitua o conteúdo inteiro do seu ficheiro server/routes.ts por este código abaixo.
-
-TypeScript
-
 import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
