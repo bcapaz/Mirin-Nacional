@@ -45,8 +45,6 @@ export function Sidebar() {
   const navItems = [
     { label: "Página Inicial", icon: <Home className="w-5 h-5" />, href: "/", active: location === "/" },
     { label: "Meu Perfil", icon: <User className="w-5 h-5" />, href: `/profile/${user.id}`, active: location.startsWith("/profile/") },
-    { label: "Buscar", icon: <Search className="w-5 h-5" />, href: "#", active: false, onClick: () => setShowSearch(true) },
-    { label: "Notificações", icon: <Bell className="w-5 h-5" />, href: "#", active: false, onClick: () => setShowNotifications(true) },
     { label: "Voltar ao Site", icon: <ArrowLeft className="w-5 h-5" />, href: "https://sites.google.com/view/sitenacionalmirim/in%C3%ADcio", external: true, active: false }
   ];
   
