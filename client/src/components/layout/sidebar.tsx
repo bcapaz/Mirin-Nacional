@@ -63,7 +63,6 @@ export function Sidebar() {
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <img src={mirinLogo} alt="Logo Mirin" className="h-16 w-auto mr-3" />
-                <h1 className="text-xl font-bold text-foreground">Site Nacional Mirin</h1>
               </div>
               <button className="md:hidden text-foreground" onClick={toggleMobileMenu}>
                 <Menu className="w-6 h-6" />
