@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
 import { User as UserType } from "@shared/schema";
+import mirinLogo from "./mirin-logo.png"; // [ADICIONADO] Importa a imagem da logo
 
 export function Sidebar() {
   const { user, logoutMutation } = useAuth();
@@ -58,8 +59,12 @@ export function Sidebar() {
       <aside className="w-full md:w-64 md:h-screen bg-sidebar-background border-r border-border md:fixed z-20">
         <div className="flex flex-col h-full">
           <div className="p-4 border-b border-border">
+            {/* [MODIFICADO] Adicionada a logo ao lado do título */}
             <div className="flex items-center justify-between">
-              <h1 className="text-xl font-bold text-foreground">Site Nacional Mirin</h1>
+              <div className="flex items-center">
+                <img src={mirinLogo} alt="Logo Mirin" className="h-8 w-auto mr-3" />
+                <h1 className="text-xl font-bold text-foreground">Site Nacional Mirin</h1>
+              </div>
               <button className="md:hidden text-foreground" onClick={toggleMobileMenu}>
                 <Menu className="w-6 h-6" />
               </button>
@@ -77,7 +82,6 @@ export function Sidebar() {
           </div>
           
           <nav className={`flex-1 overflow-y-auto p-2 ${isMobileMenuOpen ? 'block' : 'hidden md:block'}`}>
-            {/* Secção 1: Links de Navegação Principais */}
             <div className="space-y-1">
               {navItems.map((item: any) => (
                 item.external ? (
@@ -99,7 +103,6 @@ export function Sidebar() {
               ))}
             </div>
 
-            {/* Secção 2: Lista de Delegações */}
             <div className="mt-6 p-2">
               <div className="flex items-center mb-2">
                 <Users className="w-5 h-5 mr-3 text-muted-foreground"/>
@@ -136,7 +139,6 @@ export function Sidebar() {
         </div>
       </aside>
       
-      {/* Diálogos */}
       <Dialog open={showSearch} onOpenChange={setShowSearch}>
         {/* ... */}
       </Dialog>
