@@ -62,7 +62,7 @@ export function Sidebar() {
             {/* [MODIFICADO] Adicionada a logo ao lado do título */}
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <img src={mirinLogo} alt="Logo Mirin" className="h-14 w-auto mr-3" />
+                <img src={mirinLogo} alt="Logo Mirin" className="h-16 w-auto mr-3" />
                 <h1 className="text-xl font-bold text-foreground">Site Nacional Mirin</h1>
               </div>
               <button className="md:hidden text-foreground" onClick={toggleMobileMenu}>
