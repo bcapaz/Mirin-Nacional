@@ -10,6 +10,6 @@ if (!process.env.DATABASE_URL) {
 }
 
 export const pool = new Pool({
-  connectionString: postgresql://postgres:[YOUR-PASSWORD]@db.cyltnomeebcexvtgnduj.supabase.co:5432/postgres,
+  connectionString: postgresql://postgres:#Idbsf0305@db.cyltnomeebcexvtgnduj.supabase.co:5432/postgres,
 });
 export const db = drizzle(pool, { schema });
