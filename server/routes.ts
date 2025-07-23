@@ -31,25 +31,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
   // --- ROTAS GET ---
-  app.get("/api/tweets", async (req, res) => {
+app.get("/api/tweets", async (req, res) => {
     try {
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
-      const now = Date.now();
-      const isCacheValid = cache.tweets && (now - cache.lastFetch < CACHE_DURATION_MS);
+      const limit = 10;
+      // O cursor vem como string da URL (ex: /api/tweets?cursor=2023-10-27T10:00:00.000Z)
+      const cursor = req.query.cursor as string | undefined;
+      
+      // @ts-ignore
+      const userId = req.user.id;
 
-      // Se o cache for válido, retorna os dados do cache
-      if (isCacheValid) {
-        console.log("Servindo tweets do cache.");
-        // @ts-ignore
-        // Precisamos filtrar os likes e reposts para o usuário atual, mesmo com cache
-        const tweetsWithUserData = cache.tweets.map(tweet => ({
-            ...tweet,
-            likedByUser: tweet.likes.some(like => like.userId === req.user.id),
-            repostedByUser: tweet.reposts.some(repost => repost.userId === req.user.id),
-        }));
-        return res.json(tweetsWithUserData);
+      const tweets = await storage.getAllTweets(userId, { limit, cursor });
+
+      // Lógica para determinar o próximo cursor:
+      // Se recebemos exatamente o número de tweets que pedimos (o limite),
+      // é provável que haja mais. O próximo cursor será a data do último tweet que recebemos.
+      let nextCursor: string | null = null;
+      if (tweets.length === limit) {
+        // Pegamos a data do último tweet da lista e a convertemos para o formato string ISO
+        nextCursor = tweets[tweets.length - 1].createdAt.toISOString();
       }
+
+      // Retornamos os tweets e o cursor para a próxima página
+      return res.json({
+        tweets,
+        nextCursor,
+      });
+
+    } catch (error) {
+      console.error("Error fetching tweets:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
 
       // Se o cache não for válido, busca do banco de dados
       console.log("Buscando tweets do banco de dados.");
