@@ -76,19 +76,42 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getAllTweets(currentUserId: number): Promise<TweetWithUser[]> {
-    const result = await db.select({
-      id: tweets.id, content: tweets.content, mediaData: tweets.mediaData, userId: tweets.userId,
-      createdAt: tweets.createdAt, likeCount: tweets.likeCount, repostCount: tweets.repostCount,
-      commentCount: sql<number>`(SELECT count(*) FROM ${tweets} AS comments WHERE comments.parent_id = ${tweets.id})`.mapWith(Number),
-      user: { id: users.id, username: users.username, name: users.name, profileImage: users.profileImage, avatarColor: users.avatarColor },
-      isLiked: sql<boolean>`EXISTS(SELECT 1 FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id} AND ${likes.userId} = ${currentUserId})`.mapWith(Boolean),
-      isReposted: sql<boolean>`EXISTS(SELECT 1 FROM ${reposts} WHERE ${reposts.tweetId} = ${tweets.id} AND ${reposts.userId} = ${currentUserId})`.mapWith(Boolean),
-    })
-    .from(tweets)
-    .innerJoin(users, eq(tweets.userId, users.id))
-    .where(eq(tweets.isComment, false))
-    .orderBy(desc(tweets.createdAt));
+  async getAllTweets(
+    currentUserId: number,
+    options: { limit?: number; cursor?: string } = {}
+  ): Promise<TweetWithUser[]> {
+    const { limit = 10, cursor } = options; // Padrão de 10 tweets
+
+    // Construção da query com Drizzle
+    const query = db
+      .select({
+        id: tweets.id,
+        content: tweets.content,
+        mediaData: tweets.mediaData,
+        userId: tweets.userId,
+        createdAt: tweets.createdAt,
+        likeCount: tweets.likeCount,
+        repostCount: tweets.repostCount,
+        // Mantemos sua lógica para contar comentários e verificar likes/reposts
+        commentCount: sql<number>`(SELECT count(*) FROM ${tweets} AS comments WHERE comments.parent_id = ${tweets.id})`.mapWith(Number),
+        user: { id: users.id, username: users.username, name: users.name, profileImage: users.profileImage, avatarColor: users.avatarColor },
+        isLiked: sql<boolean>`EXISTS(SELECT 1 FROM ${likes} WHERE ${likes.tweetId} = ${tweets.id} AND ${likes.userId} = ${currentUserId})`.mapWith(Boolean),
+        isReposted: sql<boolean>`EXISTS(SELECT 1 FROM ${reposts} WHERE ${reposts.tweetId} = ${tweets.id} AND ${reposts.userId} = ${currentUserId})`.mapWith(Boolean),
+      })
+      .from(tweets)
+      .innerJoin(users, eq(tweets.userId, users.id))
+      .where(
+        // A cláusula WHERE agora combina a condição original com a do cursor
+        and(
+          eq(tweets.isComment, false),
+          // Se um cursor for fornecido, busca apenas tweets mais antigos que a data do cursor
+          cursor ? lt(tweets.createdAt, new Date(cursor)) : undefined
+        )
+      )
+      .orderBy(desc(tweets.createdAt)) // A ordenação é crucial para a paginação
+      .limit(limit); // Aplicamos o limite
+
+    const result = await query;
     return result as unknown as TweetWithUser[];
   }
 
