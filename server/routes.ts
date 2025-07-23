@@ -8,78 +8,41 @@ import { randomBytes } from "crypto"; // Importamos randomBytes
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Objeto para armazenar os tweets em cache e o tempo da última busca
-const cache = {
-  tweets: null as any[] | null,
-  lastFetch: 0,
-};
-
-// Duração do cache em milissegundos (3 minutos)
-const CACHE_DURATION_MS = 180 * 1000;
-
-/**
- * Invalida (limpa) o cache de tweets.
- * Isso força a próxima requisição a buscar os dados do banco de dados novamente.
- */
-function invalidateTweetsCache() {
-  console.log("Cache de tweets invalidado.");
-  cache.tweets = null;
-  cache.lastFetch = 0;
-}
-
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
-
+  
   // --- ROTAS GET ---
-app.get("/api/tweets", async (req, res) => {
-    try {
-      if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    app.get("/api/tweets", async (req, res) => {
+        try {
+            if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
-      const limit = 10;
-      // O cursor vem como string da URL (ex: /api/tweets?cursor=2023-10-27T10:00:00.000Z)
-      const cursor = req.query.cursor as string | undefined;
-      
-      // @ts-ignore
-      const userId = req.user.id;
+            const limit = 15;
+            // O cursor vem como uma string da URL
+            const cursor = req.query.cursor as string | undefined;
+            // @ts-ignore
+            const userId = req.user.id;
 
-      const tweets = await storage.getAllTweets(userId, { limit, cursor });
+            const tweets = await storage.getAllTweets(userId, { limit, cursor });
 
-      // Lógica para determinar o próximo cursor:
-      // Se recebemos exatamente o número de tweets que pedimos (o limite),
-      // é provável que haja mais. O próximo cursor será a data do último tweet que recebemos.
-      let nextCursor: string | null = null;
-      if (tweets.length === limit) {
-        // Pegamos a data do último tweet da lista e a convertemos para o formato string ISO
-        nextCursor = tweets[tweets.length - 1].createdAt.toISOString();
-      }
+            // Define o cursor para a próxima página
+            let nextCursor: string | null = null;
+            if (tweets.length === limit) {
+                // O próximo cursor é a data do último tweet desta página
+                nextCursor = tweets[tweets.length - 1].createdAt.toISOString();
+            }
 
-      // Retornamos os tweets e o cursor para a próxima página
-      return res.json({
-        tweets,
-        nextCursor,
-      });
+            // Retorna os dados no formato esperado pelo useInfiniteQuery
+            return res.json({
+                data: tweets,
+                nextCursor,
+            });
 
-    } catch (error) {
-      console.error("Error fetching tweets:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
+        } catch (error) {
+            console.error("Error fetching tweets:", error);
+            res.status(500).json({ message: "Internal server error" });
+        }
+    });
 
-      // Se o cache não for válido, busca do banco de dados
-      console.log("Buscando tweets do banco de dados.");
-      // @ts-ignore
-      const allTweets = await storage.getAllTweets(req.user.id);
-
-      // Atualiza o cache com os novos dados e o tempo da busca
-      cache.tweets = allTweets;
-      cache.lastFetch = Date.now();
-
-      return res.json(allTweets);
-    } catch (error) {
-      console.error("Error fetching tweets:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
 
   app.get("/api/profile/:identifier", async (req, res) => {
     try {
@@ -102,13 +65,15 @@ app.get("/api/tweets", async (req, res) => {
 
   app.get("/api/admin/users", async (req, res) => {
     try {
-      // @ts-ignore
       if (!req.isAuthenticated() || !req.user.isAdmin) {
         return res.status(403).json({ message: "Acesso negado" });
       }
-
+ 
+      // Usa a função já existente no seu storage para buscar todos os utilizadores
       const allUsers = await storage.getAllUsers();
+    
       return res.json(allUsers);
+    
     } catch (error) {
       console.error("Error fetching all users:", error);
       res.status(500).json({ message: "Erro interno do servidor" });
@@ -175,10 +140,6 @@ app.get("/api/tweets", async (req, res) => {
         userId: req.user.id,
         mediaData
       });
-      
-      // Invalida o cache pois um novo tweet foi criado
-      invalidateTweetsCache();
-
       return res.status(201).json(newTweet);
     } catch (error) {
       console.error("Error creating tweet:", error);
@@ -198,10 +159,6 @@ app.get("/api/tweets", async (req, res) => {
         return res.status(409).json({ message: "Tweet já foi curtido por este usuário" });
       }
       await storage.createLike({ userId, tweetId });
-      
-      // Invalida o cache pois um like foi adicionado
-      invalidateTweetsCache();
-
       return res.status(201).json({ message: "Tweet liked successfully" });
     } catch (error) {
       console.error("Error liking tweet:", error);
@@ -230,10 +187,6 @@ app.get("/api/tweets", async (req, res) => {
       }
       // @ts-ignore
       const updatedUser = await storage.updateUser(req.user.id, updateData);
-
-      // Invalida o cache pois os dados do usuário (que aparecem nos tweets) foram atualizados
-      invalidateTweetsCache();
-
       return res.status(200).json(updatedUser);
     } catch (error: any) {
       console.error("Error updating profile:", error);
@@ -254,10 +207,6 @@ app.get("/api/tweets", async (req, res) => {
         userId: req.user.id,
         tweetId: tweetId,
       });
-
-      // Invalida o cache pois um novo comentário foi adicionado (afeta a contagem)
-      invalidateTweetsCache();
-
       res.status(201).json(newComment);
     } catch (error) {
       console.error("Erro ao criar comentário:", error);
@@ -276,10 +225,6 @@ app.get("/api/tweets", async (req, res) => {
         return res.status(409).json({ message: "Tweet já repostado" });
       }
       await storage.createRepost(userId, tweetId);
-
-      // Invalida o cache pois um repost foi adicionado
-      invalidateTweetsCache();
-
       return res.status(201).json({ message: "Tweet repostado com sucesso" });
     } catch (error) {
       console.error("Error creating repost:", error);
@@ -287,29 +232,39 @@ app.get("/api/tweets", async (req, res) => {
     }
   });
 
+  // [ADICIONADO] Nova rota segura para redefinir a senha
   app.post("/api/admin/users/:id/reset-password", async (req, res) => {
     try {
       // @ts-ignore
       if (!req.isAuthenticated() || !req.user.isAdmin) {
         return res.status(403).json({ message: "Acesso negado." });
       }
+
       const userIdToReset = parseInt(req.params.id, 10);
       if (isNaN(userIdToReset)) {
         return res.status(400).json({ message: "ID de utilizador inválido." });
       }
+
+    // [MODIFICADO] Lemos a nova senha do corpo do pedido
       const { newPassword } = req.body;
       if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
-        return res.status(400).json({ message: "A nova senha deve ter pelo menos 6 caracteres." });
+          return res.status(400).json({ message: "A nova senha deve ter pelo menos 6 caracteres."});
       }
+
+    // Criptografa a senha fornecida pelo admin
       const hashedPassword = await hashPassword(newPassword);
+    
+    // Usa a função updateUser para guardar a nova senha
       await storage.updateUser(userIdToReset, { password: hashedPassword });
+  
+    // Já não precisamos de retornar a senha, apenas uma mensagem de sucesso
       return res.status(200).json({ success: true, message: "Senha redefinida com sucesso." });
+
     } catch (error) {
       console.error("Error resetting password:", error);
       res.status(500).json({ message: "Erro interno do servidor" });
     }
   });
-
   // --- ROTAS DELETE ---
   app.delete("/api/tweets/:id/like", async (req, res) => {
     try {
@@ -323,17 +278,13 @@ app.get("/api/tweets", async (req, res) => {
         return res.status(404).json({ message: "Like não encontrado para este usuário" });
       }
       await storage.deleteLike(userId, tweetId);
-
-      // Invalida o cache pois um like foi removido
-      invalidateTweetsCache();
-
       return res.status(200).json({ message: "Tweet unliked successfully" });
     } catch (error) {
       console.error("Error unliking tweet:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
-
+  
   app.delete('/api/tweets/:id/repost', async (req, res) => {
     try {
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
@@ -345,10 +296,6 @@ app.get("/api/tweets", async (req, res) => {
         return res.status(404).json({ message: "Repost não encontrado" });
       }
       await storage.deleteRepost(userId, tweetId);
-
-      // Invalida o cache pois um repost foi removido
-      invalidateTweetsCache();
-
       return res.status(200).json({ message: "Repost removido com sucesso" });
     } catch (error) {
       console.error("Error deleting repost:", error);
@@ -362,10 +309,6 @@ app.get("/api/tweets", async (req, res) => {
       if (!req.isAuthenticated() || !req.user.isAdmin) return res.status(403).json({ message: "Forbidden" });
       const tweetId = parseInt(req.params.id);
       await storage.deleteTweet(tweetId);
-
-      // Invalida o cache pois um tweet foi deletado
-      invalidateTweetsCache();
-
       return res.status(200).json({ success: true });
     } catch (error) {
       console.error("Error deleting tweet:", error);
