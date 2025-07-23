@@ -45,9 +45,74 @@ export default function HomePage() {
   
     const handleSuccess = () => {
         queryClient.invalidateQueries({ queryKey: ['tweets'] });
-    }      <TrendingSidebar />
+        
+    return (
+        <div className="min-h-screen flex flex-col md:flex-row">
+            <Sidebar />
+            
+            <div className="flex-1 md:ml-64">
+                <div className="max-w-4xl mx-auto md:flex">
+                    {/* Main Feed */}
+                    <div className="flex-1">
+                        {/* Header */}
+                        <header className="sticky top-0 z-10 bg-white border-b border-gray-200">
+                            <div className="px-4 py-3">
+                                <h2 className="text-xl font-bold text-gray-900">Twitter dos Delegados</h2>
+                                <p className="text-sm text-gray-500">Discuta a greve dos caminhoneiros de 2018</p>
+                            </div>
+                        </header>
+                        
+                        {/* Tweet Form */}
+                        <TweetForm onSuccess={handleSuccess} />
+                        
+                        {/* Feed */}
+                        <div className="divide-y divide-gray-200">
+                            {isLoading ? (
+                                <div className="flex justify-center py-8">
+                                    <Loader2 className="h-8 w-8 animate-spin text-[#009c3b]" />
+                                </div>
+                            ) : isError ? (
+                                <div className="p-8 text-center text-red-500">
+                                    Ocorreu um erro ao carregar as publicações.
+                                </div>
+                            ) : data?.pages ? (
+                                <>
+                                    {data.pages.map((page, i) => (
+                                        <Fragment key={i}>
+                                            {page.data.map((tweet: TweetWithUser) => (
+                                                <TweetCard key={tweet.id} tweet={tweet} />
+                                            ))}
+                                        </Fragment>
+                                    ))}
+                                    
+                                    {/* Botão de Carregar Mais e Status */}
+                                    <div className="p-4 text-center">
+                                        {hasNextPage && (
+                                            <button
+                                                onClick={() => fetchNextPage()}
+                                                disabled={isFetchingNextPage}
+                                                className="rounded-full bg-sky-500 px-4 py-2 font-bold text-white transition-colors hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-sky-800"
+                                            >
+                                                {isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
+                                            </button>
+                                        )}
+                                        {!hasNextPage && (
+                                            <p className="text-gray-500">Você chegou ao fim.</p>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="p-8 text-center text-gray-500">
+                                    Nenhuma publicação encontrada. Seja o primeiro a publicar!
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {/* Trending Sidebar */}
+                    <TrendingSidebar />
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 }
